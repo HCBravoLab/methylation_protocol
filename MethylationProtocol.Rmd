@@ -1,0 +1,159 @@
+# Methylation Analysis with Epiviz Integration
+
+## Introduction:
+
+#### Why:
+Purpose: To analyze Illumina 450k Methylation Array data to find differences in methylation 
+
+#### How:  
+Using the minfi package in Bioconductor and Epiviz as an interactive genomic tool, this protocol aims to walk through the analysis of the Illumina HumanMethylation450 BeadChip data from the Cancer Genome Atlas (TCGA) project.
+
+#### Vizualization:
+* Make a flowchart of overall procedure
+
+download/save raw Illumina 450k Methylation Array data as IDAT files ->  
+install necessary packages in R (Bioconductor, minfi, etc.) ->    
+preprocess data into final GenomicRatioSet output ->   
+find differentially methylated positions using dmpFinder method ->   
+find small differentially methylated regions using bumphunter method ->  
+find larger differentially methylated regions using blockFinder method
+
+## Procedure:
+
+### 1. Gather data:
+
+#### Why: 
+* In order to analyze the data, it must first be accessible to R.
+
+#### How:  
+* The read.450k.exp function reads a 450k experiment using a sample sheet.
+
+#### Vizualization:
+* Print out IDAT files being analyzed
+
+```{r,eval=T}
+path <- "/Users/mwalter/Documents/tcgaMethylationSubset-master"
+targets <- read.delim(file.path (path,"targets.txt"),as.is=TRUE)
+table(targets$Tissue,targets$Status)
+index <- which( targets$Status=="normal" & targets$Tissue %in% c("colon","lung") )
+targets <- targets[index,]
+library(minfi)
+rg.set <- read.450k.exp(base=path,targets=targets,verbose=TRUE)
+```
+
+### 2. Preprocessing:
+
+#### Why:
+* Need preprocessing to modify data from IDAT files into useable data sets, like an RGChannelSet, MethylSet, GenomicMethylSet, RatioSet, or GenomicRatioSet. Most of the analysis will be done on the GenomicRatioSet datatype.
+
+#### How:  
+* Use minfi's variety of preprocess...() functions to convert data sets into usable forms
+
+#### Vizualization:
+
+* Make a flow chart of how to preprocess into useful objects: 
+
+
+Input                  | Processing Function    | Output           | Analytic Use
+---------------------- | ---------------------- | ---------------- | --------------------------
+Raw data (IDAT files)  | read.450k.exp()        | RGChannelSet     | output of reading data   
+RGChannelSet           | preprocessIllumina()   | MethylSet        | dmpFinder method
+MethylSet              | mapToGenome()          | GenomicMethylSet | blockFinder method
+GenomicMethylSet       | ratioConvert()         | GenomicRatioSet  | bumphunter method
+
+* Use the function, preprocessQuantile(), after gathering data to get a GenomicRatioSet that contains probes that are stratified by region (CpG island, shore, shelf, opensea). However, this is not recommended for use in cancer-normal comparison. 
+
+*Use pie chart to visualize relative proportions of cpg islands, shores, shelves, and open sea loci.
+
+```{r,eval=T}
+gen.rat.set.quan <- preprocessQuantile(rg.set)
+cpg.type.prop <- prop.table(table(getIslandStatus(gen.rat.set.quan)))
+labels <- paste(names(cpg.type.prop),paste(round(cpg.type.prop*100,digits=1),"%",sep=""),sep=" ")
+pie(cpg.type.prop,labels=labels)
+```
+
+```{r,eval=T}
+meth.set <- preprocessIllumina(rg.set)
+gen.meth.set <- mapToGenome(meth.set)
+gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
+```
+
+* View the quality of the samples after preprocessing.  If the samples are clustered together, the data is of good quality.
+
+```{r,eval=T}
+qc <- getQC(meth.set)
+plotQC(qc)
+
+beta <- getBeta(meth.set)
+densityPlot(beta)
+```
+
+### 3. Identify differentially methylated positions (dmpFinder):
+
+#### Why:
+* To find CpG methylation differences that correspond to a particular phenotype (in this case a categorical phenotype)
+
+#### How:  
+* Uses an F-test between two groups of different phenotypes to determine which CpG loci are differentially methylated.
+
+#### Vizualization:
+* View difference in methylation amount between two different phenotypes 
+
+```{r,eval=T}
+library(doParallel)
+cores <- detectCores()
+registerDoParallel(cores)
+tissue <- pData(gen.rat.set)$Tissue
+index <- which(seqnames(gen.rat.set)=="chr22")
+meth.set.22 <- meth.set[index,]
+dmp <- dmpFinder(meth.set.22,tissue,type="categorical")
+head(dmp)
+
+cpgs <- rownames(dmp)[1:4]
+pd <- pData(rg.set)
+plotCpg(meth.set.22,cpg=cpgs,pheno=pd$Tissue,type="categorical")
+```
+
+### 4. Identify small differentially methylated regions (bumphunter):
+
+#### Why: 
+* The purpose is to find small deviations in methylation of CpG islands at the gene promoter scale (1-2kb)
+
+#### How:  
+* Bumphunting uses a cutoff value for to determine the severity in the difference in methylation and determines if it is significant enough to label it a differentially methylated region (DMR).
+
+#### Vizualization:
+* Find small differentially methylated regions using bumphunter.
+
+```{r,eval=T}
+gen.rat.set.22 <- gen.rat.set[index,]
+X <- model.matrix(~tissue)
+res <- bumphunter(gen.rat.set.22,X,cutoff=0.1,B=1000)
+head(res$tab)
+```
+
+* Create a blocks track in Epiviz and add the DMR blocks to it.  Then, zoom in and find the region defined by the start and end values in the above table.  This would verify that there is indeed a small region of differentially methylated DNA specified by this region. 
+
+### 5. Identify large differentially methylated regions (blockFinder):
+
+#### Why:
+* In comparison, block finding is used to find differences in methylation on a much larger scale than bump hunting.
+
+#### How:  
+* Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, grouping them into larger regions than bump hunting would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
+
+#### Vizualization:
+* Illustrate locus-collapsing (see minfi paper)
+
+
+```{r,eval=T}
+gen.meth.set.22 <- gen.meth.set[index,]
+cl <- cpgCollapse(gen.meth.set.22)
+blocks <- blockFinder(cl$object,X,cluster=cl$blockInfo$pns,cutoff = 0.1)
+blocks$table
+```
+
+* This can be shown by creating the hypo-methylation blocks in Epiviz.
+
+* Create a blocks track in Epiviz and add the hypo-methylation blocks to it.  Then, zoom in and find the region defined by the start and end values in the above table.  This would verify that there is indeed a large region of differentially methylated DNA specified by this region. The start and end points may not be exact depending on the resolution of the array.
+
