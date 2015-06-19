@@ -156,4 +156,3 @@ blocks$table
 * This can be shown by creating the hypo-methylation blocks in Epiviz.
 
 * Create a blocks track in Epiviz and add the hypo-methylation blocks to it.  Then, zoom in and find the region defined by the start and end values in the above table.  This would verify that there is indeed a large region of differentially methylated DNA specified by this region. The start and end points may not be exact depending on the resolution of the array.
-
