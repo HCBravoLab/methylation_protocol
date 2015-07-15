@@ -15,6 +15,7 @@ Using the minfi and epivizr packages in Bioconductor and Epiviz as an interactiv
 The TRIM29 gene is of interest because of its opposing functions in various cancers.  In some, it acts as a tumor suppressor (in breast cancers), and in others, it acts as an oncogene (pancreatic and lung cancers).  
 
 #### Workflow:
+<<<<<<< HEAD
 Packages needed: Bioconductor, minfi, epivizr, GenomicFeatures (within Bioconductor)
 
 ```{r,eval=F}
@@ -25,6 +26,9 @@ biocLite("GenomicFeatures")
 biocLite("BSgenome.Hsapiens.UCSC.hg19")
 biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
 ```
+=======
+Packages needed: minfi, epivizr, TCGA-Assembler
+>>>>>>> origin/master
 
 * Make a flowchart of overall procedure
 
@@ -39,6 +43,7 @@ find larger differentially methylated regions using blockFinder method
 
 ### 1. Gather data:
 
+<<<<<<< HEAD
 In order to analyze the data, it must first be loaded into R.
 
 Download TCGA 450k methylation array using the data matrix in the data portal
@@ -281,13 +286,62 @@ rg.set <- read.450k(targets$Basename,verbose=TRUE)
 pData(rg.set) <- targets
 
 table(targets$Tissue,targets$Status)
+=======
+In order to analyze the data, it must first be accessible to R.
+
+Download TCGA 450k methylation data and UCSC expression data using TCGA-Assembler package???
+	-http://www.compgenome.org/TCGA-Assembler/
+	-ending in 01 -> tumor samples
+	-ending in 11 -> normal tissue samples
+	-load BRCA (breast cancer and normal breast tissue), COAD (colon cancer), LUSC (lung cancer), UCEC (endometrial cancer) data
+
+```{r,eval=F}
+library(minfi)
+path <- "/Users/mwalter/Documents/methylation_files"
+targets.b.t <- read.delim(file.path (path,"jhu-usc.edu_BRCA.HumanMethylation450.1.9.0.sdrf.txt"),as.is=TRUE)
+targets.b.t$Type <- "breast"
+targets.b.t$Status <- "tumor"
+
+targets.b.n <- read.delim(file.path (path,"jhu-usc.edu_BRCA.HumanMethylation450.1.9.0.sdrf.txt"),as.is=TRUE)
+targets.b.n$Type <- "breast"
+targets.b.n$Status <- "normal"
+
+targets.l.n <- read.delim(file.path (path,"jhu-usc.edu_LUSC.HumanMethylation450.1.7.0.sdrf.txt"),as.is=TRUE)
+targets.l.n$Type <- "lung"
+targets.l.n$Status <- "normal"
+
+targets.c.n <- read.delim(file.path (path,"jhu-usc.edu_COAD.HumanMethylation450.1.9.0.sdrf.txt"),as.is=TRUE)
+targets.c.n$Type <- "colon"
+targets.c.n$Status <- "normal"
+
+path <- "/Users/mwalter/Documents/methylation_files"
+targets <- rbind(targets.b.t,targets.l.n,targets.c.n)
+targets <- targets[file.exists(file.path(path, targets$Array.Data.File)),]
+targets <- targets[grepl("Red", targets$Array.Data.File),]
+targets$Basename <- file.path(path, targets$Array.Data.File)
+table(targets$Type,targets$Status)
+path <- "/Users/mwalter/Documents/TCGA-Assembler/brca1_DirectoryTraverseResult"
+targets <- read.delim(file.path(path,"brca1_DirectoryTraverseResult"))
+rg.set <- read.450k.exp(path,verbose=TRUE)
+
+targets <- read.table(list.files(path, pattern="sdrf", full.name=TRUE), header=TRUE, sep="\t")
+targets <- targets[file.exists(file.path(path, targets$Array.Data.File)),]
+targets <- targets[grepl("Red", targets$Array.Data.File),]
+targets$Basename <- gsub("_Red.*$", "", file.path(path, targets$Array.Data.File))
+rownames(targets) <- basename(targets$Basename)
+head(targets)
+>>>>>>> origin/master
 ```
 
 ### 2. Preprocessing:
 
 Process data into usable objects for the minfi package.
 
+<<<<<<< HEAD
 Need preprocessing to modify data from IDAT files into useable data sets, like an RGChannelSet, MethylSet, GenomicMethylSet, RatioSet, or GenomicRatioSet for the minfi functions to work. -Most of the analysis will be done on the GenomicRatioSet datatype.
+=======
+Need preprocessing to modify data from IDAT files into useable data sets, like an RGChannelSet, MethylSet, GenomicMethylSet, RatioSet, or GenomicRatioSet for the minfi functions to work. Most of this analysis will be done on the GenomicRatioSet datatype.
+>>>>>>> origin/master
 
 Use minfi's variety of preprocess...() functions to convert data sets into usable forms
 
@@ -296,12 +350,20 @@ Make a flow chart of how to preprocess into useful objects:
 
 Input                  | Processing Function    | Output           | Analytic Use
 ---------------------- | ---------------------- | ---------------- | --------------------------
+<<<<<<< HEAD
 Raw data (IDAT files)  | read.450k()            | RGChannelSet     | output of reading data   
+=======
+Raw data (IDAT files)  | read.450k.exp()        | RGChannelSet     | output of reading data   
+>>>>>>> origin/master
 RGChannelSet           | preprocessIllumina()   | MethylSet        | dmpFinder method
 MethylSet              | mapToGenome()          | GenomicMethylSet | blockFinder method
 GenomicMethylSet       | ratioConvert()         | GenomicRatioSet  | bumphunter method
 
+<<<<<<< HEAD
 ```{r,eval=T}
+=======
+```{r,eval=F}
+>>>>>>> origin/master
 meth.set <- preprocessIllumina(rg.set)
 gen.meth.set <- mapToGenome(meth.set)
 gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
@@ -311,6 +373,7 @@ gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
 
 Use Epiviz to vizualize the results found in R session
 
+<<<<<<< HEAD
 Start Epiviz in web, starting from a pre-existing workspace (delete all tracks but "Genes" and "CpG Islands")
 
 ```{r, eval=T}
@@ -318,11 +381,26 @@ require(epivizr)
 mgr <- startEpiviz(workspace="WZCPGTd7Duv",tryPorts=TRUE)
 #mgr <- startEpiviz(workspace="Usv3U8lGh7v",tryPorts=TRUE)
 #mgr$service()
+=======
+Start Epiviz in web
+
+```{r, eval=F}
+require(epivizr)
+
+mgr <- startEpiviz(tryPorts=TRUE)
+mgr$service()
+>>>>>>> origin/master
 ```
 
 ### 4. DMP Identificaiton:
 
+<<<<<<< HEAD
 Overall, compare normal breast tissue to tumor breast tissue to find small differentially methylated gene regions.
+=======
+Overall, compare normal breast tissue to normal colon tissue to find small differentially methylated gene regions.
+
+#### A. R Analysis:
+>>>>>>> origin/master
 
 Use dmpFinder to find differentially methylated positions to find CpG methylation differences that correspond to a particular phenotype (in this case breast normal and breast tumor)
 
@@ -330,6 +408,7 @@ dmpFinder uses an F-test between two groups of different phenotypes to determine
 
 Look at difference between normal breast and tumor breast tissues
 
+<<<<<<< HEAD
 
 Start with the genes track at the top
 
@@ -454,16 +533,110 @@ IR <- IRanges(start=c(44282278,61038553,131265454,134869972,38368319,15810399,53
 IR <- IR*0.5
 GR <- GRanges(c("chr11","chr20","chr10","chr5","chr22","chr17","chr8","chr1"),IR)
 mgr$slideshow(GR)
+=======
+There is a CpG island at the transcription start site of TRIM29 that is differentially methylated 
+
+```{r,eval=F}
+library(doParallel)
+cores <- detectCores()
+registerDoParallel(cores)
+status <- pData(brca.grs)$Status
+#index <- which(seqnames(gen.rat.set)=="chr9")
+#meth.set.9 <- meth.set[index,]
+dmp <- dmpFinder(meth.set,type="categorical")
+head(dmp)
+```
+
+#### B. Epiviz Workspace:
+
+View difference in methylation amount between two different phenotypes 
+
+In Epiviz, create a blocks track that shows the location of the DMPs and a block the shows the location of CpGs
+
+```{r, eval=F}
+cpg.gr <- granges(gen.meth.set)
+
+cpgs <- mgr$addDevice(cpg.gr, "CpG Locations")
+```
+
+```{r, eval=F}
+dmp.gr <- granges(gen.meth.set[rownames(dmp)])
+
+dmps <- mgr$addDevice(dmp.gr, "Differentially Methylated Positions")
+```
+
+Add track of p-values to show which DMPs are significant (not significant if p > 0.05:
+
+```{r, eval=F}
+pvals <- mgr$addDevice(-log10(dmp$pval), "P-Values (-log10) of Differentially Methylated Positions")
+getM(gen.rat.set)
+```
+
+Add track of smooth difference in methylation
+
+```{r, eval=F}
+beta <- getBeta(gen.rat.set)
+beta.gr <- granges(gen.meth.set[rownames(beta)])
+cpg.gr <- granges(gen.meth.set[rownames(bumps$fitted)])
+meth.diff <- mgr$addDevice(cpg.gr,"Methylation Difference",type="bp")
+``````
+
+### 5. DMR Identificaiton:
+
+#### A. R Analysis:
+
+Use bumphunter to find small differentially methylated regions (small deviations in methylation of CpG islands at the gene promoter scale, 1-2kb)
+
+Bumphunting uses a cutoff value to determine the severity in the difference in methylation and determines if it is significant enough to label it as a differentially methylated region (DMR).
+
+Compare:
+breast and colon
+breast and lung 
+breast and endometrium
+
+Combine results to show common DMRs (about 120 loci) between normal breast tissue and the other three normal tissues
+
+```{r,eval=F}
+X <- model.matrix(~status)
+gr <- granges(gen.meth.set)
+chr=as.factor(seqnames(gr))
+pos=start(gr)
+cl=clusterMaker(chr,pos,maxGap=500)
+bumps <- bumphunter(gen.rat.set,X,cluster=cl,cutoff=0.1,B=0)
+```
+
+#### B. Epiviz Workspace:
+
+Look at transcription regulators, where differences in methylation have been found (ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29,TP73)
+
+Methylation differences for these genes between normal and cancer tissues 
+
+These genes all have roles in tissue differentiation, cancer, or epigenetic regulation
+
+Create a blocks track in Epiviz and add the DMR blocks to it (both hypo-methylated and hyper-methylated blocks).  Then, zoom in and find the region defined by the start and end values in the above table.  This would verify that there is indeed a small region of differentially methylated DNA specified by this region. 
+
+```{r, eval=F}
+dmr.gr <- with(bumps$table,GRanges(chr,IRanges(start,end),area=area,value=value))
+dmr.gr$type <- ifelse(abs(dmr.gr$value)<0.2, "neither", ifelse(dmr.gr$value<0,"hypo","hyper"))
+table(dmr.gr$type)
+
+hypo.dmr <- mgr$addDevice(subset(dmr.gr,dmr.gr$type=="hypo"), "Hypo-methylated Regions")
+hyper.dmr <- mgr$addDevice(subset(dmr.gr,dmr.gr$type=="hyper"), "Hyper-methylated Regions")
+>>>>>>> origin/master
 ```
 
 ### 6. Block Identificaiton:
 
+<<<<<<< HEAD
 Load new Epiviz workspace to look at epigenetic differences between breast normal, colon normal, and lung normal tissues
 
 ```{r,eval=T}
 mgr <- startEpiviz(workspace="Ago25FdPLVb",tryPorts=TRUE)
 beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
+=======
+#### A. R Analysis:
+>>>>>>> origin/master
 
 Identify large differentially methylated regions using blockFinder
 
@@ -472,6 +645,7 @@ In comparison, block finding is used to find differences in methylation on a muc
 Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, grouping them into larger regions than bump hunting would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
 
 ```{r,eval=F}
+<<<<<<< HEAD
 memory.limit(size=10000)
 gen.meth.set.breast <- gen.meth.set[,which(gen.meth.set$Tissue=="breast")]
 #gen.meth.set.colon <- gen.meth.set[,which(gen.meth.set$Tissue=="colon")] 
@@ -489,11 +663,26 @@ blocks <- blockFinder(cl$object,X,cluster=cl$blockInfo$pns,cutoff = 0.1)
 ```
 
 Create a blocks track in Epiviz and add the hypo-methylation blocks to it. 
+=======
+#index <- which(seqnames(gen.rat.set)=="chr9")
+#gen.meth.set.9 <- gen.meth.set[index,]
+cl <- cpgCollapse(gen.meth.set)
+blocks <- blockFinder(cl$object,X,cluster=cl$blockInfo$pns,cutoff = 0.1)
+head(blocks$table)
+```
+
+#### B. Epiviz Workspace:
+
+This can be shown by creating the hypo-methylation blocks in Epiviz.
+
+Create a blocks track in Epiviz and add the hypo-methylation blocks to it.  Then, zoom in and find the region defined by the start and end values in the above table.  This would verify that there is indeed a large region of differentially methylated DNA specified by this region. The start and end points may not be exact depending on the resolution of the array.
+>>>>>>> origin/master
 
 ```{r, eval=F}
 seqnames <- blocks$table$chr
 ranges <- IRanges(start=blocks$table$start,end=blocks$table$end)
 blocks.gr <- GRanges(seqnames=seqnames,ranges=ranges)
+<<<<<<< HEAD
 meth.blocks <- mgr$addDevice(blocks.gr, "Differentially Methylated Blocks")
 ```
 
@@ -511,3 +700,46 @@ mgr$slideshow(GR)
 Epiviz Workspace Screenshot
 
 <img src="/Users/mwalter/Documents/screenshots/EpivizScreenshot.png" width="2000" height="1200" /> 
+=======
+mgr$service()
+meth.blocks <- mgr$addDevice(blocks.gr, "Differentially Methylated Blocks")
+mgr$service()
+```
+
+### 7. Useful Epiviz Workspace Additions:
+
+Look more in depth, specifically at the TRIM29 gene (located on chromosome 11 at base pairs 119513394-119513711
+
+Epiviz slideshow to show top five differentially methylated promoter regions
+
+```{r, eval=F}
+foldChange=mat[,"cancer"]-mat[,"normal"]
+ind=order(foldChange,decreasing=TRUE)
+
+# bounding 1Mb around each exon
+slideshowRegions <- trim(rowRanges(sumexp)[ind] + 1000000L)
+mgr$slideshow(slideshowRegions, n=5)
+```
+
+Use UCSC expression data
+
+Transcription start site known to have differences in methylation (50% methylated in normal breast tissue, 100% in other normal tissues)
+		-at the TRIM29 gene, methylation increases going from normal to tumor breast tissue, but decreases going from normal to other tumor types
+		-look at methylation between different breast cancer types using UCSC expression data
+		    -ER- basal normal-like (high expression of TRIM29)
+		    -ER+ luminal tumor-like (low expression of TRIM29)
+		    -inverse relationship with methyaltion levels at this regionStart Epiviz in web
+
+Create MA plot to show average expression and difference in expression between breast normal and breast tumor at determined genes of interest
+
+```{r, eval=F}
+colData <- DataFrame(name=c("M","A"))
+rownames(colData) <- colData$name
+
+rowData <- gr
+rowData$cpg <- names(gr)
+
+fit <- lmFit(gen.rat.set,X)
+cpg.sum.exp <- SummarizedExperiment(rowData=rowData,assays=SimpleList(ma=cbind(fit$coef[,2],fit$Amean)),colData=colData)
+```
+>>>>>>> origin/master
