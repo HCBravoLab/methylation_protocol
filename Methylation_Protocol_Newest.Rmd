@@ -72,7 +72,7 @@ After unzipping the files that are emailed to you, save each cancer type (BRCA, 
 
 Load breast tumor and breast normal data
 
-```{r,eval=T}
+```{r,eval=F}
 library(minfi)
 datadir <- "/Users/mwalter/Documents/methylation_files/breast"
 
@@ -134,7 +134,7 @@ targets.breast$Sex <- targets.breast$patient.gender
 
 Load colon normal data
 
-```{r,eval=T}
+```{r,eval=F}
 datadir <- "/Users/mwalter/Documents/methylation_files/colon"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
@@ -195,7 +195,7 @@ targets.colon$Sex <- targets.colon$patient.gender
 
 Load lung normal data
 
-```{r,eval=T}
+```{r,eval=F}
 datadir <- "/Users/mwalter/Documents/methylation_files/lung"
 
 
@@ -259,7 +259,7 @@ rm(list=ls()[!(ls() %in% c('targets.breast','targets.colon','targets.lung'))])
 
 Merge and read data
 
-```{r,eval=T}
+```{r,eval=F}
 merge <- merge(targets.breast,targets.colon,all=TRUE)
 targets <- merge(merge,targets.lung,all=TRUE)
 targets <- targets[which(file.exists(paste0(targets$Basename,"_Grn.idat"))),]
@@ -289,7 +289,7 @@ RGChannelSet           | preprocessIllumina()   | MethylSet        | dmpFinder m
 MethylSet              | mapToGenome()          | GenomicMethylSet | blockFinder method
 GenomicMethylSet       | ratioConvert()         | GenomicRatioSet  | bumphunter method
 
-```{r,eval=T}
+```{r,eval=F}
 meth.set <- preprocessIllumina(rg.set)
 gen.meth.set <- mapToGenome(meth.set)
 gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
@@ -301,7 +301,7 @@ Use Epiviz to vizualize the results found in R session
 
 Start Epiviz in web, starting from a pre-existing workspace (delete all tracks but "Genes" and "CpG Islands")
 
-```{r, eval=T}
+```{r, eval=F}
 require(epivizr)
 mgr <- startEpiviz(workspace="WZCPGTd7Duv",tryPorts=TRUE)
 #mgr <- startEpiviz(workspace="Usv3U8lGh7v",tryPorts=TRUE)
@@ -320,7 +320,7 @@ Start with the genes track at the top
 
 Add promoter regions in 
 
-```{r,eval=T}
+```{r,eval=F}
 library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 promoter.regions <- promoters(TxDb.Hsapiens.UCSC.hg19.knownGene,upstream=2000,downstream=200)
@@ -329,7 +329,7 @@ promoters <- mgr$addDevice(promoter.regions, "Promoters")
 
 In Epiviz, add a blocks track to show the location of the DMPs
 
-```{r,eval=T}
+```{r,eval=F}
 library(doParallel)
 cores <- detectCores()
 registerDoParallel(cores)
@@ -342,14 +342,14 @@ dmps <- mgr$addDevice(dmp.gr, "Differentially Methylated Positions")
 
 Add track of p-values underneath to show which DMPs are significant (not significant if p > 0.05):
 
-```{r, eval=T}
+```{r, eval=F}
 dmp.gr$pval <- -log10(dmp$pval)
 pvals <- mgr$addDevice(dmp.gr, "P-Values (-log10) of DMPs",type="bp",columns="pval")
 ```
 
 Add beta-values to show methylation difference across genome for each tissue type and status that is biologically interpretable
 
-```{r,eval=T}
+```{r,eval=F}
 memory.limit(size=10000)
 grs.breast.tum <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="cancer")]
 grs.breast.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="normal")]
@@ -415,7 +415,7 @@ hyper.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hyper")], "Hyper-methylate
 
 Navigate the Epiviz workspace window to display the TRIM29 gene (located on chromosome 11 at base pairs 119513394-119513711)
 
-```{r,eval=T}
+```{r,eval=F}
 mgr$navigate("chr11",119870000,120100000)
 ```
 
@@ -434,7 +434,7 @@ SREBP1.......chr17.....15810399.....19837017
 ST18.........chr8......53023392.....53130461
 TP73.........chr1......3569129......3652765
 
-```{r,eval=T}
+```{r,eval=F}
 IR <- IRanges(start=c(44282278,61038553,131265454,134869972,38368319,15810399,53023392,3569129),end=c(44331716,61051026,131565783,134871639,38380539,19837017,53130461,3652765))
 IR <- IR*0.5
 GR <- GRanges(c("chr11","chr20","chr10","chr5","chr22","chr17","chr8","chr1"),IR)
@@ -445,7 +445,7 @@ mgr$slideshow(GR)
 
 Load new Epiviz workspace to look at epigenetic differences between breast normal, colon normal, and lung normal tissues
 
-```{r,eval=T}
+```{r,eval=F}
 mgr <- startEpiviz(workspace="Ago25FdPLVb",tryPorts=TRUE)
 beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
