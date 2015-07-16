@@ -1,8 +1,13 @@
+---
+title: Methylation Analysis with Epiviz Integration
+author: Morgan Walter
+output: html_document
+---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(cache=TRUE)
 ```
-# Methylation Analysis with Epiviz Integration
-
+ 
 ## Introduction:
 
 #### Purpose: 
@@ -41,8 +46,8 @@ Follow along with the screenshots:
 
 
 Settings for breast tumor and breast normal download
-  
-<img src="/Users/mwalter/Documents/screenshots/brca_mat.png" width="600" height="600" />  
+
+![BRCA download settings](images/brca_mat.png)  
   
 Chosen breast samples for the analysis 
   
