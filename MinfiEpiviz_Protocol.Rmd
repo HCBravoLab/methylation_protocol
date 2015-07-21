@@ -10,18 +10,17 @@ knitr::opts_chunk$set(cache=TRUE)
  
 ## Introduction:
 
-#### Purpose: 
-To analyze Illumina 450k Methylation Array data to find differences in methylation at the TRIM29 gene located on chromosome 11 and other transcription regulators between various tumor samples (breast, lung, colon) and between normal and tumor breast cancer samples. 
+The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene.  
 
-#### How:  
-Using the minfi and epivizr packages in Bioconductor and Epiviz as an interactive genomic tool, this protocol aims to walk through the analysis of the Illumina HumanMethylation450 Array data from the Cancer Genome Atlas (TCGA) project.
+The reference for the research mentioned is:
 
-#### Why:
-The TRIM29 gene is of interest because of its opposing functions in various cancers.  In some, it acts as a tumor suppressor (in breast cancers), and in others, it acts as an oncogene (lung cancers).  
+* Avraham A, Cho SS, UhlmannR, Polak ML, Sandbank J, Karni T, et al. (2014) Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer. PLoS ONE 9(3): e91805. doi:10.1371/journal.pone.0091805
+
+We will use mainly the minfi and epivizr packages in Bioconductor. The minfi package is used to do the analyses requiring the identification of differentially methylated positions, regions, and blocks. The epivizr package is used to serve data generated in R to the Epiviz workspace, which is used as an interactive genomic vizualization tool. Epiviz is an interactive genomic tool, this protocol aims to walk through the analysis of the Illumina HumanMethylation450 Array data from the Cancer Genome Atlas (TCGA) project.
 
 ## 1. Getting Started
 
-Packages needed: Bioconductor, minfi, epivizr, GenomicFeatures (within Bioconductor)
+Install the needed packages: Bioconductor, minfi, epivizr, GenomicFeatures, BSgenome.Hsapiens.UCSC.hg19, and TxDb.Hsapiens.UCSC.hg19.knownGene  
 
 ```{r,eval=F}
 source("http://bioconductor.org/biocLite.R")
@@ -36,9 +35,9 @@ biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
 
 In order to analyze the data, it must first be loaded into R.
 
-Download TCGA 450k methylation array using the data matrix in the data portal
+Download 450k Illumina Human Methylation data from the Cancer Genome Atlas (TCGA) project using the data matrix in the data portal.
 
-https://tcga-data.nci.nih.gov/tcga/dataAccessMatrix.htm
+* https://tcga-data.nci.nih.gov/tcga/dataAccessMatrix.htm
 
 When selecting data, choose samples that end in 01 (TCGA-..-....-01) for solid tissue tumor samples and samples that end in 11 (TCGA-..-....-11) for solid tissue normal samples.
 
@@ -346,8 +345,11 @@ Add track of p-values underneath to show which DMPs are significant (not signifi
 
 ```{r, eval=F}
 dmp.gr$pval <- -log10(dmp$pval)
-pvals <- mgr$addDevice(dmp.gr, "P-Values (-log10) of DMPs",type="bp",columns="pval")
+pvals <- mgr$addMeasurements(dmp.gr, "P-Values (-log10) of DMPs",type="bp",columns="pval")
+mgr$listDevices()
 ```
+
+Now that the p-value measurements have been added, add a stacked track of the p-values to view them, using the "Vizualizations" button.
 
 Add beta-values to show methylation difference across genome for each tissue type and status that is biologically interpretable (percent methylation)
 
