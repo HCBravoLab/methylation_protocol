@@ -1,16 +1,18 @@
 ---
-title: Minfi Methylation Analysis with Epiviz Integration
-author: Morgan Walter
-output: html_document
+title: "Minfi Methylation Analysis with Epiviz Integration"
+author: "Morgan Walter"
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
+library(knitr)
 knitr::opts_chunk$set(cache=TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=90))
 ```
  
-## Introduction:
+## Introduction
 
-The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene.  
+The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, and gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene.  
      
 The reference for the research mentioned is:
 
@@ -18,19 +20,19 @@ The reference for the research mentioned is:
 
 We will use mainly the minfi and epivizr packages in Bioconductor. The minfi package is used to do the analyses requiring the identification of differentially methylated positions, regions, and blocks. The epivizr package is used to serve data generated in R to the Epiviz workspace, which is used as an interactive genomic visualization tool. This protocol aims to walk through the analysis and visualization of the Illumina Infinium Human Methylation 450k data from the Cancer Genome Atlas (TCGA) project.
 
-## Motivation:
+## Motivation
 
-#### Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer (Avraham et al., 2014)
+#### Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer (Avraham et al., 2014)     
 
 Research findings from Avraham et al. in 2014 conclude that the TRIpartite Motif-containing 29 (TRIM29), also called the ataxia telangiectasia group D-complementing (ATDC), has differing functions in various cancer types. In breast cancer, the expression of TRIM29 is less than the expression in normal breast tissue, and it acts as a tumor suppressor. The promoter of the gene is hypo-methylated in normal breast tissue, but hyper-methylated in other normal tissues, like the colon, lung, and endometrium, where it is oncogenic. In tumor breast tissues, the methylation increased and expression decreased when compared with normal breast tissues. In comparisons between other cancer types and their respective normal tissues, the opposite methylation pattern was observed.   
 
 The researchers identified 110 genes that were differentially methylated in the breast compared to all other epithelial tissues tested. Of these 110 genes, a group 15 of them were DNA binding and transcription regulators, which were found to have a notable relevance to cancer. Their analysis of TCGA data for these genes, including ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29, and TP73, revealed methylation differences at most of the corresponding loci between normal and tumor breast samples. The methylation pattern also varied between breast cancer types, including basal, luminal-A and luminal-B, and between different normal tissue types, identifying these gene regions as differentially methylated regions (DMRs). The TRIM29 gene has a CpG island at the transcription start site of the gene (between 120,008,000 and 120,009,000 on chromosome 11). 
 
-In breast tissues, it was found that this CpG island was hypo-methylated methylation, and in other tissues, including colon and lung, it has full methylation. These results were found analyzing Illumina-Infinium HumanMethylation27 array data.  TRIM29 expression was higher in normal breast tissues than in other normal tissues tested. The main conlcusion proposed by authors was that, "Epigenetic alterations affecting tissue-specific differentiation are the predominant mechanism by which epigenetic changes cause cancer." Although the findings of the research were interesting, the paper lacked good visualizations of the 450k Illumina Human Methylation data, and the goal of this protocol is to provide a better one that can also be used to view other genes of interest in any cancer type, as the data is available for the whole genome.
+In breast tissues, it was found that this CpG island was hypo-methylated methylation, and in other tissues, including colon and lung, it has full methylation. These results were found analyzing Illumina-Infinium HumanMethylation27 array data.  TRIM29 expression was higher in normal breast tissues than in other normal tissues tested. The main conclusion proposed by authors was that, "Epigenetic alterations affecting tissue-specific differentiation are the predominant mechanism by which epigenetic changes cause cancer." Although the findings of the research were interesting, the paper lacked good visualizations of the 450k Illumina Human Methylation data, and the goal of this protocol is to provide a better one that can also be used to view other genes of interest in any cancer type, as the data is available for the whole genome.
 
 ## 1. Getting Started
 
-Install the needed packages in R: Bioconductor, minfi, epivizr, GenomicFeatures, BSgenome.Hsapiens.UCSC.hg19, and TxDb.Hsapiens.UCSC.hg19.knownGene  
+Install the needed packages in R: Bioconductor, minfi, epivizr, GenomicFeatures, BSgenome.Hsapiens.UCSC.hg19, TxDb.Hsapiens.UCSC.hg19.knownGene, IlluminaHumanMethylation450kmanifest, IlluminaHumanMethylation450kanno.ilmn12.hg19, and doParallel  
 
 ```{r,eval=F}
 source("http://bioconductor.org/biocLite.R")
@@ -39,6 +41,9 @@ biocLite("epivizr")
 biocLite("GenomicFeatures")
 biocLite("BSgenome.Hsapiens.UCSC.hg19")
 biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
+biocLite("IlluminaHumanMethylation450kmanifest")
+biocLite("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+install.packages("doParallel")
 ```
 
 ## 2. Gather Data
@@ -57,14 +62,33 @@ The data can be downloaded using the data matrix in TCGA's data portal, found he
 
 When selecting the data, be sure to choose only the samples that end in 01 (TCGA-..-....-01) for solid tissue tumor types and samples that end in 11 (TCGA-..-....-11) for solid tissue normal types. For each cancer type, once the correct settings are selected, click the "Build Archive" button and then download the data. The settings used for the data matrix page and the specific TCGA samples chosen are shown in the following screenshots:
 
-Cancer Type | Filter Settings                                | Samples                                          
------------ | ---------------                                | --------------                                         
-BRCA normal | ![BRCA download settings](images/brca_mat.png) | ![BRCA-normal chosen samples](images/brca_norm_dat.png)
-BRCA tumor  | ![BRCA download settings](images/brca_mat.png) | ![BRCA-tumor chosen samples](images/brca_tum_dat.png)
-COAD normal | ![COAD download settings](images/coad_mat.png) | ![COAD-normal chosen samples](images/coad_norm_dat.png)
-LUSC normal | ![LUSC download settings](images/lusc_mat.png) | ![LUSC-normal chosen samples](images/lusc_norm_dat.png)
+\newpage
+BRCA normal - Filter Settings  
+![BRCA download settings](images/brca_mat.png)
+\newpage
+BRCA normal - Samples   
+![BRCA-normal chosen samples](images/brca_norm_dat.png)
+\newpage
+BRCA tumor - Samples  
+![BRCA-tumor chosen samples](images/brca_tum_dat.png)
+\newpage
+COAD normal - Filter Settings  
+![COAD download settings](images/coad_mat.png)  
+\newpage
+COAD normal - Samples  
+![COAD-normal chosen samples](images/coad_norm_dat.png)
+\newpage
+LUSC normal - Filter Settings  
+![LUSC download settings](images/lusc_mat.png)
+\newpage
+LUSC normal - Samples  
+![LUSC-normal chosen samples](images/lusc_norm_dat.png)
+\newpage
 
-After unzipping the files that are sent to the email of your choice, save each cancer type (BRCA, COAD, LUSC) as different folders under a new directory, like "datadir" shown below.
+After unzipping the files that are sent to the email of your choice, save each cancer type (BRCA, COAD, LUSC) as different folders under a new directory, like "datadir" shown below. You will need to update the path to the files.
+
+The next three chucks of code, which read in the TCGA methylation data, were adapted from https://github.com/genomicsclass/labs/blob/master/Rscripts/read_tcga_meth.R
+
 
 Load breast tumor and breast normal data.
 
@@ -253,9 +277,9 @@ targets.lung$Sex <- targets.lung$patient.gender
 rm(list=ls()[!(ls() %in% c('targets.breast','targets.colon','targets.lung'))])
 ```
 
-Merge and read data from BRCA, COAD, and LUSC samples     .
+Merge and read data from BRCA, COAD, and LUSC samples.
 
-```{r,eval=T}
+```{r,eval=T,message=F,results="hide"}
 merge <- merge(targets.breast,targets.colon,all=TRUE)
 targets <- merge(merge,targets.lung,all=TRUE)
 targets <- targets[which(file.exists(paste0(targets$Basename,"_Grn.idat"))),]
@@ -278,9 +302,10 @@ RGChannelSet           | preprocessIllumina()   | MethylSet        | dmpFinder m
 MethylSet              | mapToGenome()          | GenomicMethylSet | blockFinder method
 GenomicMethylSet       | ratioConvert()         | GenomicRatioSet  | bumphunter method
 
-These steps make a GenomicRatioSet out of a RGChannelSet.
+These steps make a GenomicRatioSet out of an RGChannelSet.
 
-```{r,eval=T}
+```{r,eval=T,results="hide"}
+memory.limit(size=10000)
 meth.set <- preprocessIllumina(rg.set)
 gen.meth.set <- mapToGenome(meth.set)
 gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
@@ -290,17 +315,31 @@ gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
 
 #### Load Epiviz Workspace #1:
 
-Start Epiviz in the web, beginning from a pre-existing workspace that contains a "Genes" track, "CpG Islands" track, and a Gene Expression Barcode data heatmap of the four sample types. It is possible to start a new workspace from scratch, however, the gene, cpg island, and heatmap data will not be available in it.
+The pre-existing workspaces used in this protocol are modifications of the ones from the following paper: 
 
-```{r, eval=T}
+* Timp W, Bravo HC, McDonald OG, Goggins M, Umbricht C, Zeiger M, Feinberg AP, Irizarry RA (2014) Large hypomethylated blocks as a universal defining epigenetic alteration in human solid tumors. Genome Med 6(8):61. doi:10.1186/s13073-014-0061-y
+
+Follow these steps to save them as new Epiviz workspaces:
+
+* Go to the link: epiviz.github.io/timp2014
+* Login using an appropriate account
+* Type the chosen name of the workspace in space that reads "Save Workspace Name" and click "Save Workspace" button
+
+![Starting Epiviz Workspace](images/epiviz_window.png)  
+
+Your workspace will now be saved under your account, but it can still be accessed by others, as the URL is specific to each workspace. You can load the existing workspace used in this protocol, like shown below.
+
+Start an Epiviz workspace in the web that contains a "Genes" track, "CpG Islands" track, and a Gene Expression Barcode data heatmap of the four sample types. It is possible to start a new workspace from scratch, however, the gene, CpG island, and heatmap data will not be available in it.
+
+```{r, eval=F}
 require(epivizr)
-mgr <- startEpiviz(workspace="GpnylaSdPmn",tryPorts=TRUE)
+mgr <- startEpiviz(workspace="U2YaLjNoR2",tryPorts=TRUE)
 ```
  
 If you are using a Windows machine and the data is not changing while interacting with the Epiviz interface, enter the following into the console to make the added charts connect properly.
 
-```{r,eval=T}
-#mgr$service()
+```{r,eval=F}
+mgr$service()
 ```
 
 #### Analysis in R:
@@ -318,7 +357,7 @@ Epiviz charts needed for DMP visualization:
 
 Find and add promoter regions to workspace as a blocks track.
 
-```{r,eval=T}
+```{r,eval=F}
 library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 promoter.regions <- promoters(TxDb.Hsapiens.UCSC.hg19.knownGene,upstream=2000,downstream=200)
@@ -327,7 +366,7 @@ promoters <- mgr$addDevice(promoter.regions, "Promoters")
 
 Minfi's main function to find differentially methylated positions is "dmpFinder". It uses single probe analysis on CpGs to find methylation differences and an F-test between two groups of different phenotypes to determine which CpG loci are differentially methylated (in this case between BRCA normal and tumor samples). In Epiviz, add a blocks track to show the location of the DMPs with respect to all other charts.
 
-```{r,eval=T}
+```{r,eval=F}
 library(doParallel)
 cores <- detectCores()
 registerDoParallel(cores)
@@ -340,20 +379,24 @@ dmps <- mgr$addDevice(dmp.gr, "Differentially Methylated Positions")
 
 Add the p-value data as an EpivizBpData datatype so that is can be used in different track types. 
 
-```{r, eval=T}
+```{r, eval=F}
 dmp.gr$pval <- -log10(dmp$pval)
 pvals <- mgr$addMeasurements(dmp.gr, "P-Values (-log10) of DMPs",type="bp",columns="pval")
 ```
 
 Now that the p-value measurements have been added, add a stacked track of the p-values to show which DMPs are significant, using the "Visualizations" button. The measurement can be found under datasource group of the last device just added (starts with epivizMs_bp...).
 
-```{r, eval=T}
+```{r, eval=F}
 mgr$listDevices()
 ```
 
+![Select Datasource Group](images/epiviz_Ms.png)  
+
+![Select Measurements](images/pval.png)  
+
 Add beta-values to show methylation difference that is biologically interpretable (percent methylation) across the genome for each tissue type and status. 
 
-```{r,eval=T}
+```{r,eval=F,results="hide"}
 memory.limit(size=10000)
 grs.breast.tum <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="cancer")]
 grs.breast.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="normal")]
@@ -391,14 +434,15 @@ Add an MA plot of BRCA methylation to visualize which methylation difference poi
 
 * Use beta.breast.tum and beta.breast.norm that were already added to the Epiviz workspace 
 * Use "Computed Measurements" to create plot with existing data with the x-axis showing the average methylation and the y-axis showing the difference in methylation between normal and tumor samples
+* Further instructions for creating MA plots in Epiviz can be found here: epiviz.github.io/computed-measurements.html 
 
 Navigate the Epiviz workspace window to display the TRIM29 gene (located on chromosome 11 at base pairs 119513394-119513711) for later comparison to previous research. You can zoom in to get a closer look at the methylation differences at the CpG island at the TRIM29 promoter.
 
-```{r,eval=T}
+```{r,eval=F}
 mgr$navigate("chr11",119870000,120100000)
 ```
 
-The ending DMP Vizualization workspace should look like this: 
+The ending DMP Visualization workspace should look like this:   
 ![DMP Visualization](images/dmp_viz.png)  
 
 ## 5. DMR Visualization
@@ -407,7 +451,7 @@ The ending DMP Vizualization workspace should look like this:
 
 Load new Epiviz workspace to look at small spans of epigenetic differences that may influence differences in gene expression.
 
-```{r,eval=T}
+```{r,eval=F}
 require(epivizr) 
 mgr <- startEpiviz(workspace="WXlQ1wsxwme",tryPorts=TRUE)
 ```
@@ -428,7 +472,7 @@ Epiviz charts needed for DMR visualization:
 
 This section uses the same objects generated from the code above to create the DMP workspace, but should also be added to the DMR workspace. 
 
-```{r,eval=T}
+```{r,eval=F}
 promoters <- mgr$addDevice(promoter.regions, "Promoters")
 beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
@@ -437,7 +481,7 @@ beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("b
 
 Next, use Minfi's bumphunter function to find differentially methylated regions, which are deviations in the methylation of small CpG loci clusters at the gene promoter scale (1-2kb), between normal and tumor breast tissue. Bumphunting uses a cutoff value to determine the severity in the difference in methylation and determines if it is significant enough to label it as a differentially methylated region (DMR).
 
-```{r,eval=T}
+```{r,eval=T,results="hide",message=F}
 gen.rat.set.breast <- gen.rat.set[,which(gen.rat.set$Tissue=="breast")]
 status <- pData(gen.rat.set.breast)$Status
 X <- model.matrix(~status)
@@ -450,7 +494,7 @@ bumps <- bumphunter(gen.rat.set.breast,X,cluster=cl,cutoff=0.1,B=0)
 
 Add general differentially methylated regions, hypo-methylated regions, and hyper-methylated regions block tracks between normal and tumor breast tissue types to the workspace. The hypo-methylated and hyper-methylated regions should add up to make the total amount of differentially methylated regions.
 
-```{r, eval=T}
+```{r, eval=F}
 dmr.gr <- with(bumps$table,GRanges(chr,IRanges(start,end),area=area,value=value))
 dmr.gr$type <- ifelse(abs(dmr.gr$value)<0.1, "neither", ifelse(dmr.gr$value<0,"hypo","hyper"))
 table(dmr.gr$type)
@@ -462,7 +506,7 @@ hyper.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hyper")], "Hyper-methylate
 
 Display differentially methylated promoters by finding overlaps in promoter and breast DMR GRanges objects.
 
-```{r,eval=T}
+```{r,eval=F}
 dmr.promoters <- subsetByOverlaps(dmr.gr,promoter.regions)
 diff.meth.promoters <- mgr$addDevice(dmr.promoters, "Differentially Methylated Promoters")
 ```
@@ -482,26 +526,23 @@ SREBP1           | 17           | 15810399  | 19837017
 ST18             | 8            | 53023392  | 53130461
 TP73             | 1            | 3569129   | 3652765
 
-```{r,eval=T}
+```{r,eval=F}
 IR <- IRanges(start=c(44282278,61038553,131265454,134869972,38368319,15810399,53023392,3569129),end=c(44331716,61051026,131565783,134871639,38380539,19837017,53130461,3652765))
 IR <- IR*0.5
 GR <- GRanges(c("chr11","chr20","chr10","chr5","chr22","chr17","chr8","chr1"),IR)
-#mgr$slideshow(GR)
+mgr$slideshow(GR)
 ```
 
 If there are no known gene promoters to be looked at, slideshow regions of the most differentially methylated promoter regions could reveal new interesting findings.
 
-```{r,eval=T}
+```{r,eval=F}
 hypo.promoters <- dmr.promoters[which(dmr.promoters$type=="hypo")]
 top.promoters <- head(hypo.promoters,5)
-start(top.promoters) <- start(top.promoters) - 100000
-end(top.promoters) <- end(top.promoters) + 100000
-#mgr$slideshow(top.promoters)
+top.promoters <- top.promoters + 10000
+mgr$slideshow(top.promoters)
 ```
 
-The ending workspace should look like this: 
-
-DMR Vizualization
+The ending DMR Visualization workspace should look like this:   
 ![DMR Visualization](images/dmr_viz.png)  
 
 ## 6. Block Visualization
@@ -510,7 +551,7 @@ DMR Vizualization
 
 Load new Epiviz workspace to look at large spans of epigenetic differences that may influence differences in gene expression.
 
-```{r,eval=T}
+```{r,eval=F}
 require(epivizr)
 mgr <- startEpiviz(workspace="ONiOYNJDEzv",tryPorts=TRUE)
 ```
@@ -532,7 +573,7 @@ Epiviz charts needed for DMR visualization:
 
 This section uses the same objects generated from the code above to create the DMR workspace, but should also be added to the Blocks workspace. 
 
-```{r,eval=T}
+```{r,eval=F}
 promoters <- mgr$addDevice(promoter.regions, "Promoters")
 beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
@@ -543,14 +584,14 @@ beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("b
 
 View the breast beta methylation difference, which shows the severity of the deviation between the normal and tumor breast tissue methylation.
 
-```{r,eval=T}
+```{r,eval=F}
 cpg.gr$beta.breast.diff <- cpg.gr$beta.breast.tum-cpg.gr$beta.breast.norm
 meth.diff <- mgr$addDevice(cpg.gr,"Methylation Beta Difference",type="bp",columns="beta.breast.diff")
 ```
 
 In comparison to bumphunter, Minfi's blockFinder function is used to find differences in methylation on a much larger scale than bump hunting (gene scale instead of promoter scale). Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, groups them into larger regions than bump hunting     only would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
 
-```{r,eval=T}
+```{r,eval=T,warning=F,results="hide",message=F}
 memory.limit(size=10000)
 gen.meth.set.breast <- gen.meth.set[,which(gen.meth.set$Tissue=="breast")]
 status <- pData(gen.meth.set.breast)$Status
@@ -561,19 +602,19 @@ blocks <- blockFinder(cl$object,X,cluster=cl$blockInfo$pns,cutoff = 0.1)
 
 Add general blocks, hypo-methylated blocks, and hyper-methylated blocks block tracks between normal and tumor breast tissue types to the workspace. The hypo-methylated blocks and the hyper-methylated blocks should add up to make the total amount of differentially methylated blocks.
 
-```{r, eval=T}
+```{r, eval=F}
 blocks.gr <- with(blocks$table,GRanges(chr,IRanges(start,end),area=area,value=value))
 blocks.gr$type <- ifelse(abs(blocks.gr$value)<0.1, "neither", ifelse(blocks.gr$value<0,"hypo","hyper"))
 table(blocks.gr$type)
 
 meth.blocks <- mgr$addDevice(blocks.gr, "Breast Blocks")
-hypo.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hypo")],"Hypo-methylated Blocks")
+hypo.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hypo")],"Hypo-methylated Blocks")   
 hyper.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hyper")],"Hyper-methylated Blocks")
 ```
 
 Display differentially methylated genes by finding overlaps in promoter and breast blocks GRanges objects.
 
-```{r,eval=T}
+```{r,eval=F}
 library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 gene.regions <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene,columns="gene_id",single.strand.genes.only=TRUE)
@@ -583,48 +624,80 @@ diff.meth.genes <- mgr$addDevice(block.genes,"Differentially Methylated Genes")
 
 If there are no known genes to be looked at, slideshow regions of the most differentially methylated gene regions may be interesting to review.
 
-```{r,eval=T}
+```{r,eval=F}
 top.genes <- head(block.genes,5)
-start(top.genes) <- start(top.genes) - 1000000
-end(top.genes) <- end(top.genes) + 1000000
-#mgr$slideshow(top.genes)
+top.genes <- top.genes + 1000000
+mgr$slideshow(top.genes)
 ```
 
-The ending workspace should look like this: 
-
-Block Vizualization
+The ending Block Visualization workspace should look like this:   
 ![Block Visualization](images/block_viz.png) 
 
-## Results:
+## Results in Comparison to Past Research
 
 #### At the Promoter Level:
 
-Beta Value Box Plot (Avraham et al., 2014)
+Beta Value Box Plot (Avraham et al., 2014)    
 ![Beta Value Box Plot](images/avraham_paper.png)  
 
-From the plot above, it can be seen that the researchers found that BRCA normal is just under 70% methylated, BRCA tumor is about 85% methylated, COAD normal is 90% methylated, and LUSC normal is 85% methylated. 
+From the plot above, it can be seen that the researchers found that BRCA normal is just under 70% methylated, BRCA tumor is about 85% methylated, COAD normal is 90% methylated, and LUSC normal is 85% methylated.   
 
-CpG Island at TRIM29 Gene
+CpG Island at TRIM29 Gene  
 ![CpG Island at TRIM29 Gene](images/TRIM29_cpg.png) 
 
-By looking at the beta methylation value track, it can be estimated that normal breast tissue is about 60% methylated, tumor breat tissue is 75% methylated, normal colon tissue is 90% methylated, and normal lung tissue is 85% methylated. While, the estimated methylation percentages do not match completely with those observed by the authors (50% for normal breast tissue and 100% for the other three), their relative values and trends do. Methylation increases from breast normal to tumor and also increases in normal tissue from breast to colon and breast to lung.  
+By looking at the beta methylation value track, it can be estimated that normal breast tissue is about 60% methylated, tumor breast tissue is 75% methylated, normal colon tissue is 90% methylated, and normal lung tissue is 85% methylated. While, the estimated methylation percentages do not match completely with those observed by the authors (50% for normal breast tissue and 100% for the other three), their relative values and trends do. Methylation increases from breast normal to tumor and also increases in normal tissue from breast to colon and breast to lung.  
 
-The expression levels are consistent with that of the paper as well. The TRIM29 gene is most heavily expressed in the breast normal tissue, as shown by the darker shade of blue, and is similarly expressed between breast tumor, colon normal, and lung normal samples, with lighter shades of blue. this follows along with their idea that epigenetic differences seen in cancer show similarities with those of tissue differentiation, at least in this particular gene observed.  
+The expression levels are consistent with that of the paper as well. The TRIM29 gene is most heavily expressed in the breast normal tissue, as shown by the darker shade of blue, and is similarly expressed between breast tumor, colon normal, and lung normal samples, with lighter shades of blue. This follows along with their proposal that epigenetic differences seen in cancer show similarities with those of tissue differentiation, at least in this particular gene observed.  
 
 #### At the Gene Level:
- 
+
 The authors noted differences in methylation at various DNA binding and transcription regulator genes.  Below is a summary of what the researchers found in comparison to what was seen in the Minfi-Epiviz protocol.
 
-Gene   | Methylation Observations                                 | Expression Level
------- | -- ------------------------------------------------------ | ----------------
--      | Tissue Specific Methylation Paper; Minfi-Epiviz Protocol | Tissue Specific Methylation Paper; Minfi-Epiviz Protocol
-ALX4   | not mentioned; hyper-methylated promoter                 | expression reduced in breast cancers;  no expression in any of the four samples
-ST18   | hypermethylated; hypermethylated near promoter           | silenced in breast cancers; not expressed in the normal tissues, barely expressed in breast tumor
-TP73   | not mentioned; hyper-methylated overall                  | down-regulated in breast cancers; no expression in any of the four samples
-TRIM29 | hypo-methylated in normal breast, hyper-methylated in other normal tissues, hyper-methylated in breast cancer; hyper-methylated in breast tumor compared to breast normal | repressed in breast cancer, colon normal, and lung normal; most expressed in normal breast tissue, barely expressed in tumor breast tissue, and unexpressed in normal colon and normal lung tissue
+Gene   | Methylation Observations                               
+------ | -------------------------------------------------------- 
+-      | Tissue Specific Methylation Paper; Minfi-Epiviz Protocol 
+ALX4   | not mentioned; hyper-methylated promoter                 
+ST18   | hypermethylated; hypermethylated near promoter           
+TP73   | not mentioned; hyper-methylated overall                  
+TRIM29 | hypo-methylated in normal breast, hyper-methylated in other normal tissues, hyper-methylated 
+-      | in breast cancer; hyper-methylated in breast tumor compared to breast normal 
 
-Most of the methylation observations from both sources were the same. However, the gene expression levels appear to be different.  When the paper about tissue specific DNA methylation recorded that the gene expression was reduced, it often showed up on the heatmaps, generated by the protocol, to be unexpressed throughout the four samples. 
+Gene   | Expression Level
+------ | ----------------
+-      | Tissue Specific Methylation Paper; Minfi-Epiviz Protocol
+ALX4   | expression reduced in breast cancers;  no expression in any of the four samples
+ST18   | silenced in breast cancers; not expressed in the normal tissues, barely expressed in breast tumor
+TP73   | down-regulated in breast cancers; no expression in any of the four samples
+TRIM29 | repressed in breast cancer, colon normal, and lung normal; most expressed in normal breast tissue, 
+-      | barely expressed in tumor breast tissue, and unexpressed in normal colon and normal lung tissue
 
-#### Future Work:
+Most of the methylation observations from both sources were the same. However, the gene expression levels appear to be different. When the paper about tissue specific DNA methylation recorded that the gene expression was reduced, it often showed up on the heatmaps, generated by the protocol, to be unexpressed throughout the four samples. 
 
-Although this protocol only analyzes data from normal breast, tumor breast, normal colon, and normal lung tissues, these    methods can be done with any tissue types of your choice. For example, Avraham et al. examined samples that were from colon cancer and lung cancer tissues, as well as both types from the endometrium, so that they could look at not only factor that may contribute to breast cancer, but other cancers as well. It may also be interesting to verify the authors studies about differentially methylated types of breast cancer, within itself (basal, luminal-A, and luminal-B), and how they may dictate the prognosis and treatment of the disease. Through looking at this wide variety of cell types, they discovered that the TRIM29 gene was often hyper-methylated in breast cancers, but hypo-methylated in other cancers where it was re-expressed. Therefore, the authors came to the conclusion that methylation at this gene acts as a bidirectional "switch" that increases methylation from normal to tumor breast tissue, and decreases methylation from other types of normal tissue when turning into cancer, including in the colon and lung.
+## New Findings
+
+When examining the top differentially methylated promoters and genes, new genes and their promoters were found to be highly differentially methylated, other than the ones noted by Avraham et al. 
+
+Top promoters (gene) | Methylation Pattern | Expression pattern
+-------------------- | ------------------- | ------------------
+MAS1L                | hypo-methylated     | no difference between four sample types
+ZC3H12D              | hypo-methylated     | high in colon normal, medium in breast tumor, none in breast and lung normal
+GPX6                 | hypo-methylated     | no difference between four sample types
+SLC22A2              | hypo-methylated     | no difference between four sample types
+ESR1                 | hypo-methylated     | none in colon and lung normal, low in breast normal, more in breast tumor
+
+Top genes | Methylation Pattern | Expression pattern 
+--------- | ------------------- | ------------------
+TSHZ2     | hyper-methylated    | none in colon normal or lung normal, low in breast tumor, medium in breast normal
+TRIM21    | hypo-methylated     | none in breast normal or lung normal, low in breast tumor and colon normal
+C11orf40  | hypo-methylated     | no difference between four sample types
+TRIM68    | hypo-methylated     | none in lung normal, low in breast tumor and colon normal, medium in breast normal
+ZFPM2     | hypo-methylated     | none in colon normal, low in breast normal, high in breast tumor and lung normal
+CACNA1E   | hypo-methylated     | no difference between four sample types
+
+![Beta Value Box Plot](images/hypermeth_gene.png) 
+
+The hyper-methylation pattern around the TSHZ2 gene may support the previous findings that the mechanisms that differentiate tissues are the same ones that cause cancer because of the noted expression pattern where the breast tumor samples show more similarity in expression to the other two normal samples, colon and lung, than they do to the normal breast samples. The other hypo-methylated genes do not have this trend of the normal breast sample having dissimilar expression.  
+
+## Future Work
+
+Although this protocol only analyzes data from normal breast, tumor breast, normal colon, and normal lung tissues, these methods can be done with any tissue types of your choice. For example, Avraham et al. examined samples that were from colon cancer and lung cancer tissues, as well as both types from the endometrium, so that they could look at not only factor that may contribute to breast cancer, but other cancers as well. It may also be interesting to verify the authors studies about differentially methylated types of breast cancer, within itself (basal, luminal-A, and luminal-B), and how they may dictate the prognosis and treatment of the disease. Through looking at this wide variety of cell types, they discovered that the TRIM29 gene was often hyper-methylated in breast cancers, but hypo-methylated in other cancers where it was re-expressed. Therefore, the authors came to the conclusion that methylation at this gene acts as a bidirectional "switch" that increases methylation from normal to tumor breast tissue, and decreases methylation from other types of normal tissue when turning into cancer, including in the colon and lung.
