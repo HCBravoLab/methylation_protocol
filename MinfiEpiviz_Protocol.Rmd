@@ -1,21 +1,19 @@
 ---
 title: "Minfi Methylation Analysis with Epiviz Integration"
 author: "Morgan Walter"
-output: pdf_document
+output: html_document
 ---
-
-```{r setup, include=FALSE}
-library(knitr)
+  
+```{r setup,include=F}
 knitr::opts_chunk$set(cache=TRUE)
-knitr::opts_chunk$set(tidy.opts=list(width.cutoff=90))
 ```
- 
+
 ## Introduction
 
 The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, and gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene.  
-     
-The reference for the research mentioned is:
 
+The reference for the research mentioned is:
+  
 * Avraham A, Cho SS, Uhlmann R, Polak ML, Sandbank J, Karni T, et al. (2014) Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer. PLoS ONE 9(3): e91805. doi:10.1371/journal.pone.0091805
 
 We will use mainly the minfi and epivizr packages in Bioconductor. The minfi package is used to do the analyses requiring the identification of differentially methylated positions, regions, and blocks. The epivizr package is used to serve data generated in R to the Epiviz workspace, which is used as an interactive genomic visualization tool. This protocol aims to walk through the analysis and visualization of the Illumina Infinium Human Methylation 450k data from the Cancer Genome Atlas (TCGA) project.
@@ -60,60 +58,39 @@ The data can be downloaded using the data matrix in TCGA's data portal, found he
 
 * https://tcga-data.nci.nih.gov/tcga/dataAccessMatrix.htm
 
-When selecting the data, be sure to choose only the samples that end in 01 (TCGA-..-....-01) for solid tissue tumor types and samples that end in 11 (TCGA-..-....-11) for solid tissue normal types. For each cancer type, once the correct settings are selected, click the "Build Archive" button and then download the data. The settings used for the data matrix page and the specific TCGA samples chosen are shown in the following screenshots:
+*See the appendix for further instruction on how to download and prepare the data.*
 
-\newpage
-BRCA normal - Filter Settings  
-![BRCA download settings](images/brca_mat.png)
-\newpage
-BRCA normal - Samples   
-![BRCA-normal chosen samples](images/brca_norm_dat.png)
-\newpage
-BRCA tumor - Samples  
-![BRCA-tumor chosen samples](images/brca_tum_dat.png)
-\newpage
-COAD normal - Filter Settings  
-![COAD download settings](images/coad_mat.png)  
-\newpage
-COAD normal - Samples  
-![COAD-normal chosen samples](images/coad_norm_dat.png)
-\newpage
-LUSC normal - Filter Settings  
-![LUSC download settings](images/lusc_mat.png)
-\newpage
-LUSC normal - Samples  
-![LUSC-normal chosen samples](images/lusc_norm_dat.png)
-\newpage
-
-After unzipping the files that are sent to the email of your choice, save each cancer type (BRCA, COAD, LUSC) as different folders under a new directory, like "datadir" shown below. You will need to update the path to the files.
-
-The next three chucks of code, which read in the TCGA methylation data, were adapted from https://github.com/genomicsclass/labs/blob/master/Rscripts/read_tcga_meth.R
-
-
-Load breast tumor and breast normal data.
-
-```{r,eval=T}
+```{r,eval=T,include=F}
 library(minfi)
 datadir <- "/Users/mwalter/Documents/methylation_files/breast"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
-sample_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_sample_brca.txt"),sep="\t",stringsAsFactors=FALSE)
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_brca.txt"),sep="\t",stringsAsFactors=FALSE)
 keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
 sample_tab <- sample_tab[keep,]
 
-patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"), function(x) paste(x[1:3],collapse="-")))
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
 
 tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
-normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Solid Tissue Normal"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Solid Tissue
+  Normal"]
 
 # read tumor data
-tumor_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_tumor_sample_brca.txt"),sep="\t",stringsAsFactors=FALSE)
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_brca.txt"),sep="\t",
+  stringsAsFactors=FALSE)
 
-tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid", suffixes=c(".sample",".tumor"),all.x=TRUE)
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
 
 # read normal data
-normal_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_normal_control_brca.txt"),sep="\t",stringsAsFactors=FALSE)
-tab <- merge(tab, normal_tab, by="bcr_sample_uuid", suffixes=c(".tumor",".normal"),all.x=TRUE)
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_brca.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
 
 tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
 
@@ -121,16 +98,20 @@ ii <- is.na(tab$bcr_patient_barcode)
 tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
 
 # read patient data
-patient_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_clinical_patient_brca.txt"),sep="\t",stringsAsFactors=FALSE)
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_brca.txt"),sep="\t",stringsAsFactors=FALSE)
 names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
-tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y="patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
 tab <- tmp
 
 # read meth metadata
 methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
-methMeta_tab <- read.delim(file.path(methMetaDir,"jhu-usc.edu_BRCA.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_BRCA.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
 
-sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),function(x) paste(x[1:4],collapse="-"))
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
 m <- match(tab$bcr_sample_barcode,sample_barcode)
 tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
 tab <- tab[!is.na(tab$Basename),]
@@ -147,34 +128,42 @@ rm(list=objs)
 nms <- names(breast_targets)
 targets.breast <- breast_targets[nms]
 
-targets.breast$Status <- factor(ifelse(targets.breast$sample_type=="Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.breast$Status <- factor(ifelse(targets.breast$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
 targets.breast$Tissue <- tolower(targets.breast$patient.tumor_tissue_site)
 targets.breast$Sex <- targets.breast$patient.gender
-```
 
-Load colon normal data.
 
-```{r,eval=T}
+
 datadir <- "/Users/mwalter/Documents/methylation_files/colon"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
-sample_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_sample_coad.txt"),sep="\t",stringsAsFactors=FALSE)
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_coad.txt"),sep="\t",stringsAsFactors=FALSE)
 keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
 sample_tab <- sample_tab[keep,]
 
-patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"), function(x) paste(x[1:3],collapse="-")))
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
 
 tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
-normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Solid Tissue Normal"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type==
+  "Solid Tissue Normal"]
 
 # read tumor data
-tumor_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_tumor_sample_coad.txt"),sep="\t",stringsAsFactors=FALSE)
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_coad.txt"),sep="\t",
+  stringsAsFactors=FALSE)
 
-tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid", suffixes=c(".sample",".tumor"),all.x=TRUE)
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
 
 # read normal data
-normal_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_normal_control_coad.txt"),sep="\t",stringsAsFactors=FALSE)
-tab <- merge(tab, normal_tab, by="bcr_sample_uuid", suffixes=c(".tumor",".normal"),all.x=TRUE)
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_coad.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
 
 tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
 
@@ -182,16 +171,20 @@ ii <- is.na(tab$bcr_patient_barcode)
 tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
 
 # read patient data
-patient_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_clinical_patient_coad.txt"),sep="\t",stringsAsFactors=FALSE)
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_coad.txt"),sep="\t",stringsAsFactors=FALSE)
 names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
-tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y="patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
 tab <- tmp
 
 # read meth metadata
 methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
-methMeta_tab <- read.delim(file.path(methMetaDir,"jhu-usc.edu_COAD.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_COAD.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
 
-sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),function(x) paste(x[1:4],collapse="-"))
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
 m <- match(tab$bcr_sample_barcode,sample_barcode)
 tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
 tab <- tab[!is.na(tab$Basename),]
@@ -208,35 +201,43 @@ rm(list=objs)
 nms <- names(colon_targets)
 targets.colon <- colon_targets[nms]
 
-targets.colon$Status <- factor(ifelse(targets.colon$sample_type=="Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.colon$Status <- factor(ifelse(targets.colon$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
 targets.colon$Tissue <- tolower(targets.colon$patient.tumor_tissue_site)
 targets.colon$Sex <- targets.colon$patient.gender
-```
 
-Load lung normal data.
 
-```{r,eval=T}
+
 datadir <- "/Users/mwalter/Documents/methylation_files/lung"
 
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
-sample_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_sample_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
 keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
 sample_tab <- sample_tab[keep,]
 
-patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"), function(x) paste(x[1:3],collapse="-")))
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
 
 tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
-normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Solid Tissue Normal"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type==
+  "Solid Tissue Normal"]
 
 # read tumor data
-tumor_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_tumor_sample_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_lusc.txt"),sep="\t",
+  stringsAsFactors=FALSE)
 
-tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid", suffixes=c(".sample",".tumor"),all.x=TRUE)
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
 
 # read normal data
-normal_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_biospecimen_normal_control_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
-tab <- merge(tab, normal_tab, by="bcr_sample_uuid", suffixes=c(".tumor",".normal"),all.x=TRUE)
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_lusc.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
 
 tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
 
@@ -244,16 +245,20 @@ ii <- is.na(tab$bcr_patient_barcode)
 tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
 
 # read patient data
-patient_tab <- read.delim(file.path(clinicalDir,"nationwidechildrens.org_clinical_patient_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
 names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
-tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y="patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
 tab <- tmp
 
 # read meth metadata
 methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
-methMeta_tab <- read.delim(file.path(methMetaDir,"jhu-usc.edu_LUSC.HumanMethylation450.1.7.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_LUSC.HumanMethylation450.1.7.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
 
-sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),function(x) paste(x[1:4],collapse="-"))
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
 m <- match(tab$bcr_sample_barcode,sample_barcode)
 tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
 tab <- tab[!is.na(tab$Basename),]
@@ -270,16 +275,17 @@ rm(list=objs)
 nms <- names(lung_targets)
 targets.lung <- lung_targets[nms]
 
-targets.lung$Status <- factor(ifelse(targets.lung$sample_type=="Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.lung$Status <- factor(ifelse(targets.lung$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
 targets.lung$Tissue <- tolower(targets.lung$patient.tumor_tissue_site)
 targets.lung$Sex <- targets.lung$patient.gender
 
 rm(list=ls()[!(ls() %in% c('targets.breast','targets.colon','targets.lung'))])
 ```
 
-Merge and read data from BRCA, COAD, and LUSC samples.
+Merge and read methylation data.
 
-```{r,eval=T,message=F,results="hide"}
+```{r,eval=F,message=F,results="hide"}
 merge <- merge(targets.breast,targets.colon,all=TRUE)
 targets <- merge(merge,targets.lung,all=TRUE)
 targets <- targets[which(file.exists(paste0(targets$Basename,"_Grn.idat"))),]
@@ -304,7 +310,7 @@ GenomicMethylSet       | ratioConvert()         | GenomicRatioSet  | bumphunter 
 
 These steps make a GenomicRatioSet out of an RGChannelSet.
 
-```{r,eval=T,results="hide"}
+```{r,eval=F,results="hide"}
 memory.limit(size=10000)
 meth.set <- preprocessIllumina(rg.set)
 gen.meth.set <- mapToGenome(meth.set)
@@ -316,11 +322,11 @@ gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
 #### Load Epiviz Workspace #1:
 
 The pre-existing workspaces used in this protocol are modifications of the ones from the following paper: 
-
+  
 * Timp W, Bravo HC, McDonald OG, Goggins M, Umbricht C, Zeiger M, Feinberg AP, Irizarry RA (2014) Large hypomethylated blocks as a universal defining epigenetic alteration in human solid tumors. Genome Med 6(8):61. doi:10.1186/s13073-014-0061-y
 
 Follow these steps to save them as new Epiviz workspaces:
-
+  
 * Go to the link: epiviz.github.io/timp2014
 * Login using an appropriate account
 * Type the chosen name of the workspace in space that reads "Save Workspace Name" and click "Save Workspace" button
@@ -331,11 +337,11 @@ Your workspace will now be saved under your account, but it can still be accesse
 
 Start an Epiviz workspace in the web that contains a "Genes" track, "CpG Islands" track, and a Gene Expression Barcode data heatmap of the four sample types. It is possible to start a new workspace from scratch, however, the gene, CpG island, and heatmap data will not be available in it.
 
-```{r, eval=F}
+```{r,eval=F}
 require(epivizr)
 mgr <- startEpiviz(workspace="U2YaLjNoR2",tryPorts=TRUE)
 ```
- 
+
 If you are using a Windows machine and the data is not changing while interacting with the Epiviz interface, enter the following into the console to make the added charts connect properly.
 
 ```{r,eval=F}
@@ -345,7 +351,7 @@ mgr$service()
 #### Analysis in R:
 
 Epiviz charts needed for DMP visualization:
-
+  
 * Gene Expression Barcode heatmap
 * Methylation MA scatter plot
 * Genes genes track
@@ -360,7 +366,8 @@ Find and add promoter regions to workspace as a blocks track.
 ```{r,eval=F}
 library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-promoter.regions <- promoters(TxDb.Hsapiens.UCSC.hg19.knownGene,upstream=2000,downstream=200)
+promoter.regions <- promoters(TxDb.Hsapiens.UCSC.hg19.knownGene,upstream=2000,
+  downstream=200)
 promoters <- mgr$addDevice(promoter.regions, "Promoters")
 ```
 
@@ -379,14 +386,15 @@ dmps <- mgr$addDevice(dmp.gr, "Differentially Methylated Positions")
 
 Add the p-value data as an EpivizBpData datatype so that is can be used in different track types. 
 
-```{r, eval=F}
+```{r,eval=F}
 dmp.gr$pval <- -log10(dmp$pval)
-pvals <- mgr$addMeasurements(dmp.gr, "P-Values (-log10) of DMPs",type="bp",columns="pval")
+pvals <- mgr$addMeasurements(dmp.gr, "P-Values (-log10) of
+  DMPs",type="bp",columns="pval")
 ```
 
 Now that the p-value measurements have been added, add a stacked track of the p-values to show which DMPs are significant, using the "Visualizations" button. The measurement can be found under datasource group of the last device just added (starts with epivizMs_bp...).
 
-```{r, eval=F}
+```{r,eval=F}
 mgr$listDevices()
 ```
 
@@ -398,10 +406,14 @@ Add beta-values to show methylation difference that is biologically interpretabl
 
 ```{r,eval=F,results="hide"}
 memory.limit(size=10000)
-grs.breast.tum <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="cancer")]
-grs.breast.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" & gen.rat.set$Status=="normal")]
-grs.colon.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="colon" & gen.rat.set$Status=="normal")]
-grs.lung.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="lung" & gen.rat.set$Status=="normal")]
+grs.breast.tum <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" &
+  gen.rat.set$Status=="cancer")]
+grs.breast.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="breast" &
+  gen.rat.set$Status=="normal")]
+grs.colon.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="colon" &
+  gen.rat.set$Status=="normal")]
+grs.lung.norm <- gen.rat.set[,which(gen.rat.set$Tissue=="lung" &
+  gen.rat.set$Status=="normal")]
 
 beta.breast.tum <- getBeta(grs.breast.tum)
 beta.breast.norm <- getBeta(grs.breast.norm)
@@ -418,7 +430,8 @@ cpg.gr$beta.lung.norm <- rowMeans(beta.lung.norm)
 
 rm(beta.breast.tum,beta.breast.norm,beta.colon.norm,beta.lung.norm)
 
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
+beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+  c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
 Once the beta methylation value track is added, you can use the "Custom settings" button on the track to make more points visible (change "Step" to 1) and make the curve smooth (change "Interpolation" to basis). This can be done for other line tracks as well.
@@ -442,7 +455,7 @@ Navigate the Epiviz workspace window to display the TRIM29 gene (located on chro
 mgr$navigate("chr11",119870000,120100000)
 ```
 
-The ending DMP Visualization workspace should look like this:   
+The ending DMP Visualization workspace should look like this:  
 ![DMP Visualization](images/dmp_viz.png)  
 
 ## 5. DMR Visualization
@@ -474,14 +487,15 @@ This section uses the same objects generated from the code above to create the D
 
 ```{r,eval=F}
 promoters <- mgr$addDevice(promoter.regions, "Promoters")
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
+beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+  c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
 * Add a gene expression barcode heatmap to the top of the workspace (same as in DMP Visualization section).
 
 Next, use Minfi's bumphunter function to find differentially methylated regions, which are deviations in the methylation of small CpG loci clusters at the gene promoter scale (1-2kb), between normal and tumor breast tissue. Bumphunting uses a cutoff value to determine the severity in the difference in methylation and determines if it is significant enough to label it as a differentially methylated region (DMR).
 
-```{r,eval=T,results="hide",message=F}
+```{r,eval=F,results="hide",message=F}
 gen.rat.set.breast <- gen.rat.set[,which(gen.rat.set$Tissue=="breast")]
 status <- pData(gen.rat.set.breast)$Status
 X <- model.matrix(~status)
@@ -494,26 +508,29 @@ bumps <- bumphunter(gen.rat.set.breast,X,cluster=cl,cutoff=0.1,B=0)
 
 Add general differentially methylated regions, hypo-methylated regions, and hyper-methylated regions block tracks between normal and tumor breast tissue types to the workspace. The hypo-methylated and hyper-methylated regions should add up to make the total amount of differentially methylated regions.
 
-```{r, eval=F}
+```{r,eval=F}
 dmr.gr <- with(bumps$table,GRanges(chr,IRanges(start,end),area=area,value=value))
-dmr.gr$type <- ifelse(abs(dmr.gr$value)<0.1, "neither", ifelse(dmr.gr$value<0,"hypo","hyper"))
+dmr.gr$type <- ifelse(abs(dmr.gr$value)<0.1, "neither",
+  ifelse(dmr.gr$value<0,"hypo","hyper"))
 table(dmr.gr$type)
 
 bumps.dmr <- mgr$addDevice(dmr.gr, "Breast DMRs")
 hypo.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hypo")], "Hypo-methylated Regions")
-hyper.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hyper")], "Hyper-methylated Regions")
+hyper.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hyper")], "Hyper-methylated
+  Regions")
 ```
 
 Display differentially methylated promoters by finding overlaps in promoter and breast DMR GRanges objects.
 
 ```{r,eval=F}
 dmr.promoters <- subsetByOverlaps(dmr.gr,promoter.regions)
-diff.meth.promoters <- mgr$addDevice(dmr.promoters, "Differentially Methylated Promoters")
+diff.meth.promoters <- mgr$addDevice(dmr.promoters, "Differentially Methylated
+  Promoters")
 ```
 
 Add an MA plot of breast tissue expression to visualize differences in gene expression that are important.  Use the same method as in the DMP Visualization section, but with gene expression data for BRCA normal and tumor types rather than DNA methylation data.
 
-In order to compare the visualizations created in this protocol to the findings of prior research, use slideshow regions to take a closer look at the genes of interest.  In this case we will examine a few DNA binding and transcription regulator genes, where differences in methylation have been found by Avraham et al. (ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29,TP73). These genes all play a role in tissue differentiation, cancer, or epigenetic regulation.
+In order to compare the visualizations created in this protocol to the findings of prior research, use slideshow regions to take a closer look at the genes of interest. In this case we will examine a few DNA binding and transcription regulator genes, where differences in methylation have been found by Avraham et al. (ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29,TP73). These genes all play a role in tissue differentiation, cancer, or epigenetic regulation.
 
 Gene of Interest | Chromosome # | Start     | End
 ---------------- | ------------ | --------- | ---------
@@ -527,7 +544,9 @@ ST18             | 8            | 53023392  | 53130461
 TP73             | 1            | 3569129   | 3652765
 
 ```{r,eval=F}
-IR <- IRanges(start=c(44282278,61038553,131265454,134869972,38368319,15810399,53023392,3569129),end=c(44331716,61051026,131565783,134871639,38380539,19837017,53130461,3652765))
+IR <- IRanges(start=c(44282278,61038553,131265454,134869972,38368319,15810399,53023392,
+  3569129),end=c(44331716,61051026,131565783,134871639,38380539,19837017,53130461,
+  3652765))
 IR <- IR*0.5
 GR <- GRanges(c("chr11","chr20","chr10","chr5","chr22","chr17","chr8","chr1"),IR)
 mgr$slideshow(GR)
@@ -542,7 +561,7 @@ top.promoters <- top.promoters + 10000
 mgr$slideshow(top.promoters)
 ```
 
-The ending DMR Visualization workspace should look like this:   
+The ending DMR Visualization workspace should look like this:  
 ![DMR Visualization](images/dmr_viz.png)  
 
 ## 6. Block Visualization
@@ -559,7 +578,7 @@ mgr <- startEpiviz(workspace="ONiOYNJDEzv",tryPorts=TRUE)
 #### Analysis in R:
 
 Epiviz charts needed for DMR visualization:
-
+  
 * Gene Expression Barcode heatmap
 * Expression MA scatter plot
 * Genes genes track
@@ -575,7 +594,8 @@ This section uses the same objects generated from the code above to create the D
 
 ```{r,eval=F}
 promoters <- mgr$addDevice(promoter.regions, "Promoters")
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
+beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+  c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
 * Add a gene expression barcode heatmap to the top of the workspace (same as in DMP Visualization section).
@@ -586,12 +606,13 @@ View the breast beta methylation difference, which shows the severity of the dev
 
 ```{r,eval=F}
 cpg.gr$beta.breast.diff <- cpg.gr$beta.breast.tum-cpg.gr$beta.breast.norm
-meth.diff <- mgr$addDevice(cpg.gr,"Methylation Beta Difference",type="bp",columns="beta.breast.diff")
+meth.diff <- mgr$addDevice(cpg.gr,"Methylation Beta Difference",type="bp",
+  columns="beta.breast.diff")
 ```
 
 In comparison to bumphunter, Minfi's blockFinder function is used to find differences in methylation on a much larger scale than bump hunting (gene scale instead of promoter scale). Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, groups them into larger regions than bump hunting     only would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
 
-```{r,eval=T,warning=F,results="hide",message=F}
+```{r,eval=F,warning=F,results="hide",message=F}
 memory.limit(size=10000)
 gen.meth.set.breast <- gen.meth.set[,which(gen.meth.set$Tissue=="breast")]
 status <- pData(gen.meth.set.breast)$Status
@@ -602,14 +623,17 @@ blocks <- blockFinder(cl$object,X,cluster=cl$blockInfo$pns,cutoff = 0.1)
 
 Add general blocks, hypo-methylated blocks, and hyper-methylated blocks block tracks between normal and tumor breast tissue types to the workspace. The hypo-methylated blocks and the hyper-methylated blocks should add up to make the total amount of differentially methylated blocks.
 
-```{r, eval=F}
+```{r,eval=F}
 blocks.gr <- with(blocks$table,GRanges(chr,IRanges(start,end),area=area,value=value))
-blocks.gr$type <- ifelse(abs(blocks.gr$value)<0.1, "neither", ifelse(blocks.gr$value<0,"hypo","hyper"))
+blocks.gr$type <- ifelse(abs(blocks.gr$value)<0.1, "neither",
+  ifelse(blocks.gr$value<0,"hypo","hyper"))
 table(blocks.gr$type)
 
 meth.blocks <- mgr$addDevice(blocks.gr, "Breast Blocks")
-hypo.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hypo")],"Hypo-methylated Blocks")   
-hyper.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hyper")],"Hyper-methylated Blocks")
+hypo.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hypo")],
+  "Hypo-methylated Blocks")   
+hyper.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hyper")],
+  "Hyper-methylated Blocks")
 ```
 
 Display differentially methylated genes by finding overlaps in promoter and breast blocks GRanges objects.
@@ -617,7 +641,8 @@ Display differentially methylated genes by finding overlaps in promoter and brea
 ```{r,eval=F}
 library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
-gene.regions <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene,columns="gene_id",single.strand.genes.only=TRUE)
+gene.regions <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene,columns="gene_id",
+  single.strand.genes.only=TRUE)
 block.genes <- subsetByOverlaps(blocks.gr,gene.regions)
 diff.meth.genes <- mgr$addDevice(block.genes,"Differentially Methylated Genes")
 ```
@@ -630,7 +655,7 @@ top.genes <- top.genes + 1000000
 mgr$slideshow(top.genes)
 ```
 
-The ending Block Visualization workspace should look like this:   
+The ending Block Visualization workspace should look like this:  
 ![Block Visualization](images/block_viz.png) 
 
 ## Results in Comparison to Past Research
@@ -659,17 +684,19 @@ Gene   | Methylation Observations
 ALX4   | not mentioned; hyper-methylated promoter                 
 ST18   | hypermethylated; hypermethylated near promoter           
 TP73   | not mentioned; hyper-methylated overall                  
-TRIM29 | hypo-methylated in normal breast, hyper-methylated in other normal tissues, hyper-methylated 
--      | in breast cancer; hyper-methylated in breast tumor compared to breast normal 
+TRIM29 | hypo-methylated in normal breast, hyper-methylated in other normal tissues,
+-      | hyper-methylated in breast cancer; hyper-methylated in breast tumor compared
+-      | to breast normal 
 
 Gene   | Expression Level
 ------ | ----------------
 -      | Tissue Specific Methylation Paper; Minfi-Epiviz Protocol
 ALX4   | expression reduced in breast cancers;  no expression in any of the four samples
-ST18   | silenced in breast cancers; not expressed in the normal tissues, barely expressed in breast tumor
+ST18   | silenced in breast cancers; not expressed in the normal tissues, barely
+-      | expressed in breast tumor
 TP73   | down-regulated in breast cancers; no expression in any of the four samples
-TRIM29 | repressed in breast cancer, colon normal, and lung normal; most expressed in normal breast tissue, 
--      | barely expressed in tumor breast tissue, and unexpressed in normal colon and normal lung tissue
+TRIM29 | repressed in breast cancer, colon normal, and lung normal; most expressed in
+-      | normal breast tissue, barely expressed in tumor breast tissue, and unexpressed -      | in normal colon and normal lung tissue
 
 Most of the methylation observations from both sources were the same. However, the gene expression levels appear to be different. When the paper about tissue specific DNA methylation recorded that the gene expression was reduced, it often showed up on the heatmaps, generated by the protocol, to be unexpressed throughout the four samples. 
 
@@ -680,18 +707,24 @@ When examining the top differentially methylated promoters and genes, new genes 
 Top promoters (gene) | Methylation Pattern | Expression pattern
 -------------------- | ------------------- | ------------------
 MAS1L                | hypo-methylated     | no difference between four sample types
-ZC3H12D              | hypo-methylated     | high in colon normal, medium in breast tumor, none in breast and lung normal
+ZC3H12D              | hypo-methylated     | high in colon normal, medium in breast
+-                    | -                   | tumor, none in breast and lung normal
 GPX6                 | hypo-methylated     | no difference between four sample types
 SLC22A2              | hypo-methylated     | no difference between four sample types
-ESR1                 | hypo-methylated     | none in colon and lung normal, low in breast normal, more in breast tumor
+ESR1                 | hypo-methylated     | none in colon and lung normal, low in breast
+-                    | -                   | normal, more in breast tumor
 
 Top genes | Methylation Pattern | Expression pattern 
 --------- | ------------------- | ------------------
-TSHZ2     | hyper-methylated    | none in colon normal or lung normal, low in breast tumor, medium in breast normal
-TRIM21    | hypo-methylated     | none in breast normal or lung normal, low in breast tumor and colon normal
+TSHZ2     | hyper-methylated    | none in colon normal or lung normal, low in breast
+-         | -                   | tumor, medium in breast normal
+TRIM21    | hypo-methylated     | none in breast normal or lung normal, low in breast
+-         | -                   | tumor and colon normal
 C11orf40  | hypo-methylated     | no difference between four sample types
-TRIM68    | hypo-methylated     | none in lung normal, low in breast tumor and colon normal, medium in breast normal
-ZFPM2     | hypo-methylated     | none in colon normal, low in breast normal, high in breast tumor and lung normal
+TRIM68    | hypo-methylated     | none in lung normal, low in breast tumor and colon
+-         | -                   | normal, medium in breast normal
+ZFPM2     | hypo-methylated     | none in colon normal, low in breast normal, high in
+-         | -                   | breast tumor and lung normal
 CACNA1E   | hypo-methylated     | no difference between four sample types
 
 ![Beta Value Box Plot](images/hypermeth_gene.png) 
@@ -701,3 +734,264 @@ The hyper-methylation pattern around the TSHZ2 gene may support the previous fin
 ## Future Work
 
 Although this protocol only analyzes data from normal breast, tumor breast, normal colon, and normal lung tissues, these methods can be done with any tissue types of your choice. For example, Avraham et al. examined samples that were from colon cancer and lung cancer tissues, as well as both types from the endometrium, so that they could look at not only factor that may contribute to breast cancer, but other cancers as well. It may also be interesting to verify the authors studies about differentially methylated types of breast cancer, within itself (basal, luminal-A, and luminal-B), and how they may dictate the prognosis and treatment of the disease. Through looking at this wide variety of cell types, they discovered that the TRIM29 gene was often hyper-methylated in breast cancers, but hypo-methylated in other cancers where it was re-expressed. Therefore, the authors came to the conclusion that methylation at this gene acts as a bidirectional "switch" that increases methylation from normal to tumor breast tissue, and decreases methylation from other types of normal tissue when turning into cancer, including in the colon and lung.
+
+## Appendix
+
+#### Instructions for downloading methylation data:
+
+When selecting the data, be sure to choose only the samples that end in 01 (TCGA-..-....-01) for solid tissue tumor types and samples that end in 11 (TCGA-..-....-11) for solid tissue normal types. For each cancer type, once the correct settings are selected, click the "Build Archive" button and then download the data. The settings used for the data matrix page and the specific TCGA samples chosen are shown in the following screenshots:
+
+BRCA normal - Filter Settings  
+![BRCA download settings](images/brca_mat.png)
+
+
+BRCA normal - Samples   
+![BRCA-normal chosen samples](images/brca_norm_dat.png)       
+
+BRCA tumor - Samples  
+![BRCA-tumor chosen samples](images/brca_tum_dat.png)    
+
+COAD normal - Filter Settings  
+![COAD download settings](images/coad_mat.png)      
+
+COAD normal - Samples  
+![COAD-normal chosen samples](images/coad_norm_dat.png)  
+
+LUSC normal - Filter Settings  
+![LUSC download settings](images/lusc_mat.png)  
+
+LUSC normal - Samples  
+![LUSC-normal chosen samples](images/lusc_norm_dat.png)  
+
+After unzipping the files that are sent to the email of your choice, save each cancer type (BRCA, COAD, LUSC) as different folders under a new directory, like "datadir" shown below. You will need to update the path to the files.
+
+The next three chucks of code, which read in the TCGA methylation data, were adapted from https://github.com/genomicsclass/labs/blob/master/Rscripts/read_tcga_meth.R
+
+Load breast tumor and breast normal data:
+
+```{r,eval=F}
+library(minfi)
+datadir <- "/Users/mwalter/Documents/methylation_files/breast"
+
+clinicalDir <- file.path(datadir,"Clinical/Biotab")
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_brca.txt"),sep="\t",stringsAsFactors=FALSE)
+keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
+sample_tab <- sample_tab[keep,]
+
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
+
+tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Solid Tissue
+  Normal"]
+
+# read tumor data
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_brca.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
+
+# read normal data
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_brca.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
+
+tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
+
+ii <- is.na(tab$bcr_patient_barcode)
+tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
+
+# read patient data
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_brca.txt"),sep="\t",stringsAsFactors=FALSE)
+names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tab <- tmp
+
+# read meth metadata
+methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_BRCA.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
+m <- match(tab$bcr_sample_barcode,sample_barcode)
+tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
+tab <- tab[!is.na(tab$Basename),]
+
+basedir <- file.path(datadir,"DNA_Methylation/JHU_USC__HumanMethylation450/Level_1")
+tab$Basename <- file.path(basedir,tab$Basename)
+keep <- file.exists(paste(tab$Basename,"_Grn.idat",sep=""))
+breast_targets <- tab
+objs <- grep("tab",ls(),value=TRUE)
+rm(list=objs)
+objs <- grep("dir",ls(),value=TRUE,ignore=TRUE)
+rm(list=objs)
+
+nms <- names(breast_targets)
+targets.breast <- breast_targets[nms]
+
+targets.breast$Status <- factor(ifelse(targets.breast$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.breast$Tissue <- tolower(targets.breast$patient.tumor_tissue_site)
+targets.breast$Sex <- targets.breast$patient.gender
+```
+
+Load colon normal data:
+
+```{r,eval=F}
+datadir <- "/Users/mwalter/Documents/methylation_files/colon"
+
+clinicalDir <- file.path(datadir,"Clinical/Biotab")
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_coad.txt"),sep="\t",stringsAsFactors=FALSE)
+keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
+sample_tab <- sample_tab[keep,]
+
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
+
+tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type==
+  "Solid Tissue Normal"]
+
+# read tumor data
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_coad.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
+
+# read normal data
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_coad.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
+
+tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
+
+ii <- is.na(tab$bcr_patient_barcode)
+tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
+
+# read patient data
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_coad.txt"),sep="\t",stringsAsFactors=FALSE)
+names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tab <- tmp
+
+# read meth metadata
+methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_COAD.HumanMethylation450.1.9.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
+m <- match(tab$bcr_sample_barcode,sample_barcode)
+tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
+tab <- tab[!is.na(tab$Basename),]
+
+basedir <- file.path(datadir,"DNA_Methylation/JHU_USC__HumanMethylation450/Level_1")
+tab$Basename <- file.path(basedir,tab$Basename)
+keep <- file.exists(paste(tab$Basename,"_Grn.idat",sep=""))
+colon_targets <- tab
+objs <- grep("tab",ls(),value=TRUE)
+rm(list=objs)
+objs <- grep("dir",ls(),value=TRUE,ignore=TRUE)
+rm(list=objs)
+
+nms <- names(colon_targets)
+targets.colon <- colon_targets[nms]
+ 
+targets.colon$Status <- factor(ifelse(targets.colon$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.colon$Tissue <- tolower(targets.colon$patient.tumor_tissue_site)
+targets.colon$Sex <- targets.colon$patient.gender
+```
+
+Load lung normal data:
+
+```{r,eval=F}
+datadir <- "/Users/mwalter/Documents/methylation_files/lung"
+
+
+clinicalDir <- file.path(datadir,"Clinical/Biotab")
+sample_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_sample_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
+keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
+sample_tab <- sample_tab[keep,]
+
+patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
+  function(x) paste(x[1:3],collapse="-")))
+
+tumor_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type=="Primary Tumor"]
+normal_sample_id <- sample_tab$bcr_sample_uuid[sample_tab$sample_type==
+  "Solid Tissue Normal"]
+
+# read tumor data
+tumor_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_tumor_sample_lusc.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+
+tab <- merge(sample_tab, tumor_tab, by="bcr_sample_uuid",
+  suffixes=c(".sample",".tumor"),all.x=TRUE)
+
+# read normal data
+normal_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_biospecimen_normal_control_lusc.txt"),sep="\t",
+  stringsAsFactors=FALSE)
+tab <- merge(tab, normal_tab, by="bcr_sample_uuid",
+  suffixes=c(".tumor",".normal"),all.x=TRUE)
+
+tab$bcr_patient_barcode <- tab$bcr_patient_barcode.tumor
+
+ii <- is.na(tab$bcr_patient_barcode)
+tab$bcr_patient_barcode[ii] <- tab$bcr_patient_barcode.normal[ii]
+
+# read patient data
+patient_tab <- read.delim(file.path(clinicalDir,
+  "nationwidechildrens.org_clinical_patient_lusc.txt"),sep="\t",stringsAsFactors=FALSE)
+names(patient_tab) <- paste("patient",names(patient_tab),sep=".")
+tmp <- merge(tab,patient_tab,by.x="bcr_patient_barcode",by.y=
+  "patient.bcr_patient_barcode",all.x=TRUE,suffixes=c(".sample",".patient"))
+tab <- tmp
+
+# read meth metadata
+methMetaDir <- file.path(datadir,"METADATA/JHU_USC__HumanMethylation450")
+methMeta_tab <- read.delim(file.path(methMetaDir,
+  "jhu-usc.edu_LUSC.HumanMethylation450.1.7.0.sdrf.txt"),sep="\t",stringsAsFactors=FALSE)
+
+sample_barcode <- sapply(strsplit(methMeta_tab$Comment..TCGA.Barcode.,split="-"),
+  function(x) paste(x[1:4],collapse="-"))
+m <- match(tab$bcr_sample_barcode,sample_barcode)
+tab$Basename <- gsub("_Grn\\.idat","",methMeta_tab$Array.Data.File[m])
+tab <- tab[!is.na(tab$Basename),]
+
+basedir <- file.path(datadir,"DNA_Methylation/JHU_USC__HumanMethylation450/Level_1")
+tab$Basename <- file.path(basedir,tab$Basename)
+keep <- file.exists(paste(tab$Basename,"_Grn.idat",sep=""))
+lung_targets <- tab
+objs <- grep("tab",ls(),value=TRUE)
+rm(list=objs)
+objs <- grep("dir",ls(),value=TRUE,ignore=TRUE)
+rm(list=objs)
+
+nms <- names(lung_targets)
+targets.lung <- lung_targets[nms]
+
+targets.lung$Status <- factor(ifelse(targets.lung$sample_type==
+  "Primary Tumor","cancer","normal"),levels=c("normal","cancer"))
+targets.lung$Tissue <- tolower(targets.lung$patient.tumor_tissue_site)
+targets.lung$Sex <- targets.lung$patient.gender
+
+rm(list=ls()[!(ls() %in% c('targets.breast','targets.colon','targets.lung'))])
+```
