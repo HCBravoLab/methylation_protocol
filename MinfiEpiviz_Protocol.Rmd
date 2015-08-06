@@ -1,32 +1,41 @@
 ---
 title: "Minfi Methylation Analysis with Epiviz Integration"
 author: "Morgan Walter"
-output: html_document
+output: pdf_document
 ---
   
 ```{r setup,include=F}
 knitr::opts_chunk$set(cache=TRUE)
 ```
+   
+Morgan Walter^1,2^ and Hector Corrada Bravo^1,3^
+
+^1^ Center for Bioinformatics and Computational Biology, University of Maryland, College Park, Maryland, USA.  
+^2^Department of Bioengineering, University of Maryland, College Park, Maryland, USA.   
+^3^Department of Computer Science, University of Maryland, College Park, Maryland, USA.
+
+#### Keywords
+
+Bioconductor, minfi, Epiviz, epivizr, Illumina, methylation
 
 ## Introduction
 
-The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, and gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene.  
-
-The reference for the research mentioned is:
-  
-* Avraham A, Cho SS, Uhlmann R, Polak ML, Sandbank J, Karni T, et al. (2014) Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer. PLoS ONE 9(3): e91805. doi:10.1371/journal.pone.0091805
+The purpose of this protocol is to serve as a guide for analyzing 450k Illumina Human Methylation data to find differences in methylation at the base pair, promoter, and gene levels. Following along with past research findings of differentially methylated locations, the TRIM29 gene and other transcription regulators between various solid tissue samples, including breast (BRCA), and colon (COAD), and lung (LUSC), and between normal and tumor breast (BRCA) samples are observed. The TRIM29 gene is of interest because of its opposing functions in various cancers. In breast cancers, it acts as a tumor suppressor, and in others including lung cancers, it acts as an oncogene^1^.  
 
 We will use mainly the minfi and epivizr packages in Bioconductor. The minfi package is used to do the analyses requiring the identification of differentially methylated positions, regions, and blocks. The epivizr package is used to serve data generated in R to the Epiviz workspace, which is used as an interactive genomic visualization tool. This protocol aims to walk through the analysis and visualization of the Illumina Infinium Human Methylation 450k data from the Cancer Genome Atlas (TCGA) project.
+
+Here is the general process to be followed:  
+![Process](images/process.png)
 
 ## Motivation
 
 #### Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer (Avraham et al., 2014)     
 
-Research findings from Avraham et al. in 2014 conclude that the TRIpartite Motif-containing 29 (TRIM29), also called the ataxia telangiectasia group D-complementing (ATDC), has differing functions in various cancer types. In breast cancer, the expression of TRIM29 is less than the expression in normal breast tissue, and it acts as a tumor suppressor. The promoter of the gene is hypo-methylated in normal breast tissue, but hyper-methylated in other normal tissues, like the colon, lung, and endometrium, where it is oncogenic. In tumor breast tissues, the methylation increased and expression decreased when compared with normal breast tissues. In comparisons between other cancer types and their respective normal tissues, the opposite methylation pattern was observed.   
+Research findings from Avraham et al. in 2014 conclude that the TRIpartite Motif-containing 29 (TRIM29), also called the ataxia telangiectasia group D-complementing (ATDC), has differing functions in various cancer types. In breast cancer, the expression of TRIM29 is less than the expression in normal breast tissue, and it acts as a tumor suppressor. The promoter of the gene is hypo-methylated in normal breast tissue, but hyper-methylated in other normal tissues, like the colon, lung, and endometrium, where it is oncogenic. In tumor breast tissues, the methylation increased and expression decreased when compared with normal breast tissues. In comparisons between other cancer types and their respective normal tissues, the opposite methylation pattern was observed^1^.   
 
-The researchers identified 110 genes that were differentially methylated in the breast compared to all other epithelial tissues tested. Of these 110 genes, a group 15 of them were DNA binding and transcription regulators, which were found to have a notable relevance to cancer. Their analysis of TCGA data for these genes, including ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29, and TP73, revealed methylation differences at most of the corresponding loci between normal and tumor breast samples. The methylation pattern also varied between breast cancer types, including basal, luminal-A and luminal-B, and between different normal tissue types, identifying these gene regions as differentially methylated regions (DMRs). The TRIM29 gene has a CpG island at the transcription start site of the gene (between 120,008,000 and 120,009,000 on chromosome 11). 
+The researchers identified 110 genes that were differentially methylated in the breast compared to all other epithelial tissues tested. Of these 110 genes, a group 15 of them were DNA binding and transcription regulators, which were found to have a notable relevance to cancer. Their analysis of TCGA data for these genes, including ALX4, GATA5, MGMT, NEUROG1, SOX10, SREBP1, ST18, TRIM29, and TP73, revealed methylation differences at most of the corresponding loci between normal and tumor breast samples. The methylation pattern also varied between breast cancer types, including basal, luminal-A and luminal-B, and between different normal tissue types, identifying these gene regions as differentially methylated regions (DMRs). The TRIM29 gene has a CpG island at the transcription start site of the gene (between 120,008,000 and 120,009,000 on chromosome 11)^1^. 
 
-In breast tissues, it was found that this CpG island was hypo-methylated methylation, and in other tissues, including colon and lung, it has full methylation. These results were found analyzing Illumina-Infinium HumanMethylation27 array data.  TRIM29 expression was higher in normal breast tissues than in other normal tissues tested. The main conclusion proposed by authors was that, "Epigenetic alterations affecting tissue-specific differentiation are the predominant mechanism by which epigenetic changes cause cancer." Although the findings of the research were interesting, the paper lacked good visualizations of the 450k Illumina Human Methylation data, and the goal of this protocol is to provide a better one that can also be used to view other genes of interest in any cancer type, as the data is available for the whole genome.
+In breast tissues, it was found that this CpG island was hypo-methylated methylation, and in other tissues, including colon and lung, it has full methylation. These results were found analyzing Illumina-Infinium HumanMethylation27 array data.  TRIM29 expression was higher in normal breast tissues than in other normal tissues tested. The main conclusion proposed by authors was that, "Epigenetic alterations affecting tissue-specific differentiation are the predominant mechanism by which epigenetic changes cause cancer^1^." Although the findings of the research were interesting, the paper lacked good visualizations of the 450k Illumina Human Methylation data, and the goal of this protocol is to provide a better one that can also be used to view other genes of interest in any cancer type, as the data is available for the whole genome.
 
 ## 1. Getting Started
 
@@ -321,9 +330,7 @@ gen.rat.set <- ratioConvert(gen.meth.set,type="Illumina")
 
 #### Load Epiviz Workspace #1:
 
-The pre-existing workspaces used in this protocol are modifications of the ones from the following paper: 
-  
-* Timp W, Bravo HC, McDonald OG, Goggins M, Umbricht C, Zeiger M, Feinberg AP, Irizarry RA (2014) Large hypomethylated blocks as a universal defining epigenetic alteration in human solid tumors. Genome Med 6(8):61. doi:10.1186/s13073-014-0061-y
+The pre-existing workspaces used in this protocol are modifications of the ones from a paper by Timp et al. in 2014 that included visualizations of large hypo-methylated blocks^2^.
 
 Follow these steps to save them as new Epiviz workspaces:
   
@@ -735,6 +742,12 @@ The hyper-methylation pattern around the TSHZ2 gene may support the previous fin
 
 Although this protocol only analyzes data from normal breast, tumor breast, normal colon, and normal lung tissues, these methods can be done with any tissue types of your choice. For example, Avraham et al. examined samples that were from colon cancer and lung cancer tissues, as well as both types from the endometrium, so that they could look at not only factor that may contribute to breast cancer, but other cancers as well. It may also be interesting to verify the authors studies about differentially methylated types of breast cancer, within itself (basal, luminal-A, and luminal-B), and how they may dictate the prognosis and treatment of the disease. Through looking at this wide variety of cell types, they discovered that the TRIM29 gene was often hyper-methylated in breast cancers, but hypo-methylated in other cancers where it was re-expressed. Therefore, the authors came to the conclusion that methylation at this gene acts as a bidirectional "switch" that increases methylation from normal to tumor breast tissue, and decreases methylation from other types of normal tissue when turning into cancer, including in the colon and lung.
 
+## References
+
+1. Avraham A, Cho SS, Uhlmann R, Polak ML, Sandbank J, Karni T, et al. (2014) Tissue Specific DNA Methylation in Normal Human Breast Epithelium and in Breast Cancer. PLoS ONE 9(3): e91805. doi:10.1371/journal.pone.0091805
+
+2. Timp W, Bravo HC, McDonald OG, Goggins M, Umbricht C, Zeiger M, Feinberg AP, Irizarry RA (2014) Large hypomethylated blocks as a universal defining epigenetic alteration in human solid tumors. Genome Med 6(8): 61. doi:10.1186/s13073-014-0061-y
+
 ## Appendix
 
 #### Instructions for downloading methylation data:
@@ -743,29 +756,30 @@ When selecting the data, be sure to choose only the samples that end in 01 (TCGA
 
 BRCA normal - Filter Settings  
 ![BRCA download settings](images/brca_mat.png)
-
-
+  
 BRCA normal - Samples   
 ![BRCA-normal chosen samples](images/brca_norm_dat.png)       
-
+  
 BRCA tumor - Samples  
 ![BRCA-tumor chosen samples](images/brca_tum_dat.png)    
-
+  
 COAD normal - Filter Settings  
 ![COAD download settings](images/coad_mat.png)      
-
+  
 COAD normal - Samples  
 ![COAD-normal chosen samples](images/coad_norm_dat.png)  
-
+  
 LUSC normal - Filter Settings  
 ![LUSC download settings](images/lusc_mat.png)  
-
+  
 LUSC normal - Samples  
 ![LUSC-normal chosen samples](images/lusc_norm_dat.png)  
 
 After unzipping the files that are sent to the email of your choice, save each cancer type (BRCA, COAD, LUSC) as different folders under a new directory, like "datadir" shown below. You will need to update the path to the files.
 
-The next three chucks of code, which read in the TCGA methylation data, were adapted from https://github.com/genomicsclass/labs/blob/master/Rscripts/read_tcga_meth.R
+The next three chucks of code, which read in the TCGA methylation data, were adapted from the scripts for HarvardX courses: PH525x
+
+* https://github.com/genomicsclass/labs/blob/master/Rscripts/read_tcga_meth.R
 
 Load breast tumor and breast normal data:
 
@@ -777,7 +791,7 @@ clinicalDir <- file.path(datadir,"Clinical/Biotab")
 sample_tab <- read.delim(file.path(clinicalDir,
   "nationwidechildrens.org_biospecimen_sample_brca.txt"),sep="\t",stringsAsFactors=FALSE)
 keep <- sample_tab$sample_type %in% c("Primary Tumor", "Solid Tissue Normal")
-sample_tab <- sample_tab[keep,]
+sa mple_tab <- sample_tab[keep,]
 
 patient_id <- unique(sapply(strsplit(sample_tab$bcr_sample_barcode,split="-"),
   function(x) paste(x[1:3],collapse="-")))
@@ -995,3 +1009,7 @@ targets.lung$Sex <- targets.lung$patient.gender
 
 rm(list=ls()[!(ls() %in% c('targets.breast','targets.colon','targets.lung'))])
 ```
+
+## Author Contributions
+
+HCB conceived and designed the project. MW created the workflow and the document.
