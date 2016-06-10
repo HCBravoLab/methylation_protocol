@@ -45,6 +45,9 @@ Install the needed packages in R: Bioconductor, minfi, epivizr, GenomicFeatures,
 source("http://bioconductor.org/biocLite.R")
 biocLite("minfi")
 biocLite("epivizr")
+biocLite("epivizrStandalone")
+biocLite("epivizrData")
+biocLite("epivizrServer")
 biocLite("GenomicFeatures")
 biocLite("BSgenome.Hsapiens.UCSC.hg19")
 biocLite("TxDb.Hsapiens.UCSC.hg19.knownGene")
@@ -71,7 +74,7 @@ The data can be downloaded using the data matrix in TCGA's data portal, found he
 
 ```{r,eval=T,include=F}
 library(minfi)
-datadir <- "/Users/mwalter/Documents/methylation_files/breast"
+datadir <- "/Users/Morgan/Documents/methylation_files/breast"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
 sample_tab <- read.delim(file.path(clinicalDir,
@@ -144,7 +147,7 @@ targets.breast$Sex <- targets.breast$patient.gender
 
 
 
-datadir <- "/Users/mwalter/Documents/methylation_files/colon"
+datadir <- "/Users/Morgan/Documents/methylation_files/colon"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
 sample_tab <- read.delim(file.path(clinicalDir,
@@ -217,7 +220,7 @@ targets.colon$Sex <- targets.colon$patient.gender
 
 
 
-datadir <- "/Users/mwalter/Documents/methylation_files/lung"
+datadir <- "/Users/Morgan/Documents/methylation_files/lung"
 
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
@@ -300,7 +303,7 @@ targets <- merge(merge,targets.lung,all=TRUE)
 targets <- targets[which(file.exists(paste0(targets$Basename,"_Grn.idat"))),]
 
 memory.limit(size=10000)
-rg.set <- read.450k(targets$Basename,verbose=TRUE)
+rg.set <- read.metharray(targets$Basename,verbose=TRUE)
 pData(rg.set) <- targets
 
 table(targets$Tissue,targets$Status)
@@ -346,7 +349,10 @@ Start an Epiviz workspace in the web that contains a "Genes" track, "CpG Islands
 
 ```{r,eval=F}
 require(epivizr)
-mgr <- startEpiviz(workspace="U2YaLjNoR2",tryPorts=TRUE)
+require(epivizrStandalone)
+require(epivizrData)
+require(epivizrServer)
+mgr <- startEpiviz(workspace="U2YaLjNoR2",try_ports=TRUE)
 ```
 
 If you are using a Windows machine and the data is not changing while interacting with the Epiviz interface, enter the following into the console to make the added charts connect properly.
@@ -375,7 +381,7 @@ library(GenomicFeatures)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 promoter.regions <- promoters(TxDb.Hsapiens.UCSC.hg19.knownGene,upstream=2000,
   downstream=200)
-promoters <- mgr$addDevice(promoter.regions, "Promoters")
+promoters <- mgr$plot(promoter.regions,datasource_name="Promoters")
 ```
 
 Minfi's main function to find differentially methylated positions is "dmpFinder". It uses single probe analysis on CpGs to find methylation differences and an F-test between two groups of different phenotypes to determine which CpG loci are differentially methylated (in this case between BRCA normal and tumor samples). In Epiviz, add a blocks track to show the location of the DMPs with respect to all other charts.
@@ -388,22 +394,18 @@ meth.set.breast <- meth.set[,which(meth.set$Tissue=="breast")]
 dmp <- dmpFinder(meth.set.breast,meth.set.breast$Status,type="categorical")
 head(dmp)
 dmp.gr <- granges(gen.meth.set[rownames(dmp)])
-dmps <- mgr$addDevice(dmp.gr, "Differentially Methylated Positions")
+dmps <- mgr$plot(dmp.gr,datasource_name="Differentially Methylated Positions")
 ```
 
-Add the p-value data as an EpivizBpData datatype so that is can be used in different track types. 
+Add the p-value data as an EpivizBPData datatype so that is can be used in different track types. 
 
 ```{r,eval=F}
 dmp.gr$pval <- -log10(dmp$pval)
-pvals <- mgr$addMeasurements(dmp.gr, "P-Values (-log10) of
+pvals <- mgr$plot(dmp.gr,datasource_name="P-Values (-log10) of
   DMPs",type="bp",columns="pval")
 ```
 
-Now that the p-value measurements have been added, add a stacked track of the p-values to show which DMPs are significant, using the "Visualizations" button. The measurement can be found under datasource group of the last device just added (starts with epivizMs_bp...).
-
-```{r,eval=F}
-mgr$listDevices()
-```
+Now that the p-value measurements have been added, add a stacked track of the p-values to show which DMPs are significant, using the "Visualizations" button. The measurement can be found under datasource group of the last device just added ("P-Values (-log10) of DMPs" here).
 
 ![Select Datasource Group](images/epiviz_Ms.png)  
 
@@ -437,7 +439,7 @@ cpg.gr$beta.lung.norm <- rowMeans(beta.lung.norm)
 
 rm(beta.breast.tum,beta.breast.norm,beta.colon.norm,beta.lung.norm)
 
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+beta.tissue <- mgr$plot(cpg.gr,datasource_name="Percent Methylation",type="bp",columns=
   c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
@@ -473,7 +475,7 @@ Load new Epiviz workspace to look at small spans of epigenetic differences that 
 
 ```{r,eval=F}
 require(epivizr) 
-mgr <- startEpiviz(workspace="WXlQ1wsxwme",tryPorts=TRUE)
+mgr <- startEpiviz(workspace="WXlQ1wsxwme",try_ports=TRUE)
 ```
 
 #### Analysis in R:
@@ -493,8 +495,8 @@ Epiviz charts needed for DMR visualization:
 This section uses the same objects generated from the code above to create the DMP workspace, but should also be added to the DMR workspace. 
 
 ```{r,eval=F}
-promoters <- mgr$addDevice(promoter.regions, "Promoters")
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+promoters <- mgr$plot(promoter.regions,datasource_name="Promoters")
+beta.tissue <- mgr$plot(cpg.gr,datasource_name="Percent Methylation",type="bp",columns=
   c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
@@ -521,18 +523,16 @@ dmr.gr$type <- ifelse(abs(dmr.gr$value)<0.1, "neither",
   ifelse(dmr.gr$value<0,"hypo","hyper"))
 table(dmr.gr$type)
 
-bumps.dmr <- mgr$addDevice(dmr.gr, "Breast DMRs")
-hypo.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hypo")], "Hypo-methylated Regions")
-hyper.dmr <- mgr$addDevice(dmr.gr[which(dmr.gr$type=="hyper")], "Hyper-methylated
-  Regions")
+bumps.dmr <- mgr$plot(dmr.gr,datasource_name="Breast DMRs")
+hypo.dmr <- mgr$plot(dmr.gr[which(dmr.gr$type=="hypo")],datasource_name="Hypo-methylated Regions")
+hyper.dmr <- mgr$plot(dmr.gr[which(dmr.gr$type=="hyper")],datasource_name="Hyper-methylated Regions")
 ```
 
 Display differentially methylated promoters by finding overlaps in promoter and breast DMR GRanges objects.
 
 ```{r,eval=F}
 dmr.promoters <- subsetByOverlaps(dmr.gr,promoter.regions)
-diff.meth.promoters <- mgr$addDevice(dmr.promoters, "Differentially Methylated
-  Promoters")
+diff.meth.promoters <- mgr$plot(dmr.promoters,datasource_name="Differentially Methylated Promoters")
 ```
 
 Add an MA plot of breast tissue expression to visualize differences in gene expression that are important.  Use the same method as in the DMP Visualization section, but with gene expression data for BRCA normal and tumor types rather than DNA methylation data.
@@ -559,7 +559,7 @@ GR <- GRanges(c("chr11","chr20","chr10","chr5","chr22","chr17","chr8","chr1"),IR
 mgr$slideshow(GR)
 ```
 
-If there are no known gene promoters to be looked at, slideshow regions of the most differentially methylated promoter regions could reveal new interesting findings.
+If there are no known gene promoters to be looked at, slideshow regions of the most differentially methylated promoter regions could reveal new interesting findings (may have to press Enter then Esc then Enter again to continue through the slideshow).
 
 ```{r,eval=F}
 hypo.promoters <- dmr.promoters[which(dmr.promoters$type=="hypo")]
@@ -579,7 +579,7 @@ Load new Epiviz workspace to look at large spans of epigenetic differences that 
 
 ```{r,eval=F}
 require(epivizr)
-mgr <- startEpiviz(workspace="ONiOYNJDEzv",tryPorts=TRUE)
+mgr <- startEpiviz(workspace="ONiOYNJDEzv",try_ports=TRUE)
 ```
 
 #### Analysis in R:
@@ -600,8 +600,8 @@ Epiviz charts needed for DMR visualization:
 This section uses the same objects generated from the code above to create the DMR workspace, but should also be added to the Blocks workspace. 
 
 ```{r,eval=F}
-promoters <- mgr$addDevice(promoter.regions, "Promoters")
-beta.tissue <- mgr$addDevice(cpg.gr,"Percent Methylation",type="bp",columns=
+promoters <- mgr$plot(promoter.regions,datasource_name="Promoters")
+beta.tissue <- mgr$plot(cpg.gr,datasource_name="Percent Methylation",type="bp",columns=
   c("beta.breast.tum","beta.breast.norm","beta.colon.norm","beta.lung.norm"))
 ```
 
@@ -613,11 +613,11 @@ View the breast beta methylation difference, which shows the severity of the dev
 
 ```{r,eval=F}
 cpg.gr$beta.breast.diff <- cpg.gr$beta.breast.tum-cpg.gr$beta.breast.norm
-meth.diff <- mgr$addDevice(cpg.gr,"Methylation Beta Difference",type="bp",
+meth.diff <- mgr$plot(cpg.gr,datasource_name="Methylation Beta Difference",type="bp",
   columns="beta.breast.diff")
 ```
 
-In comparison to bumphunter, Minfi's blockFinder function is used to find differences in methylation on a much larger scale than bump hunting (gene scale instead of promoter scale). Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, groups them into larger regions than bump hunting     only would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
+In comparison to bumphunter, Minfi's blockFinder function is used to find differences in methylation on a much larger scale than bump hunting (gene scale instead of promoter scale). Block finding uses the cpgCollapse function to create clusters of neighboring open sea loci, groups them into larger regions than bump hunting only would, and then uses bump hunting on the averages of these regions to detect large differentially methylated regions.
 
 ```{r,eval=F,warning=F,results="hide",message=F}
 memory.limit(size=10000)
@@ -636,11 +636,11 @@ blocks.gr$type <- ifelse(abs(blocks.gr$value)<0.1, "neither",
   ifelse(blocks.gr$value<0,"hypo","hyper"))
 table(blocks.gr$type)
 
-meth.blocks <- mgr$addDevice(blocks.gr, "Breast Blocks")
-hypo.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hypo")],
-  "Hypo-methylated Blocks")   
-hyper.blocks <- mgr$addDevice(blocks.gr[which(blocks.gr$type=="hyper")],
-  "Hyper-methylated Blocks")
+meth.blocks <- mgr$plot(blocks.gr,datasource_name="Breast Blocks")
+hypo.blocks <- mgr$plot(blocks.gr[which(blocks.gr$type=="hypo")],
+  datasource_name="Hypo-methylated Blocks")   
+hyper.blocks <- mgr$plot(blocks.gr[which(blocks.gr$type=="hyper")],
+  datasource_name="Hyper-methylated Blocks")
 ```
 
 Display differentially methylated genes by finding overlaps in promoter and breast blocks GRanges objects.
@@ -651,7 +651,7 @@ library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 gene.regions <- genes(TxDb.Hsapiens.UCSC.hg19.knownGene,columns="gene_id",
   single.strand.genes.only=TRUE)
 block.genes <- subsetByOverlaps(blocks.gr,gene.regions)
-diff.meth.genes <- mgr$addDevice(block.genes,"Differentially Methylated Genes")
+diff.meth.genes <- mgr$plot(block.genes,datasource_name="Differentially Methylated Genes")
 ```
 
 If there are no known genes to be looked at, slideshow regions of the most differentially methylated gene regions may be interesting to review.
@@ -785,7 +785,7 @@ Load breast tumor and breast normal data:
 
 ```{r,eval=F}
 library(minfi)
-datadir <- "/Users/mwalter/Documents/methylation_files/breast"
+datadir <- "/Users/Morgan/Documents/methylation_files/breast"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
 sample_tab <- read.delim(file.path(clinicalDir,
@@ -860,7 +860,7 @@ targets.breast$Sex <- targets.breast$patient.gender
 Load colon normal data:
 
 ```{r,eval=F}
-datadir <- "/Users/mwalter/Documents/methylation_files/colon"
+datadir <- "/Users/Morgan/Documents/methylation_files/colon"
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
 sample_tab <- read.delim(file.path(clinicalDir,
@@ -935,7 +935,7 @@ targets.colon$Sex <- targets.colon$patient.gender
 Load lung normal data:
 
 ```{r,eval=F}
-datadir <- "/Users/mwalter/Documents/methylation_files/lung"
+datadir <- "/Users/Morgan/Documents/methylation_files/lung"
 
 
 clinicalDir <- file.path(datadir,"Clinical/Biotab")
